@@ -202,6 +202,7 @@ public class ChatFormattingUtils {
     /**
      * Creates a player name component that shows the display name with hover text showing the username
      * when they differ. For DMs, always uses the username without hover.
+     * Now includes LuckPerms prefix/suffix support and role tooltips.
      * 
      * @param player The player whose name to display
      * @param colorPrefix The color/formatting prefix to apply (e.g., "&e" or "&c&l")
@@ -233,10 +234,50 @@ public class ChatFormattingUtils {
             }
         }
 
-        // Parse the name with its color prefix first
-        MutableComponent nameComponent = (MutableComponent) parseColors(colorPrefix + nameToShow);
+        // Get LuckPerms prefix if available
+        String luckPermsPrefix = "";
+        final String prefixTooltipText;
+        
+        if (Verbatim.prefixService != null && Verbatim.prefixService.isLuckPermsAvailable()) {
+            luckPermsPrefix = Verbatim.prefixService.getPlayerPrefix(player);
+            
+            // Only get prefix tooltip if there's a prefix
+            if (!luckPermsPrefix.isEmpty()) {
+                prefixTooltipText = Verbatim.prefixService.getPrefixTooltip(player);
+            } else {
+                prefixTooltipText = null;
+            }
+        } else {
+            prefixTooltipText = null;
+        }
 
-        // Apply ClickEvent and HoverEvent (if any) to the parsed name component
+        // Build the full name component
+        MutableComponent fullNameComponent = Component.empty();
+        
+        // Add LuckPerms prefix if present with its own hover tooltip
+        if (!luckPermsPrefix.isEmpty()) {
+            MutableComponent prefixComponent = (MutableComponent) parseColors(luckPermsPrefix);
+            
+            // Apply prefix tooltip only to the prefix if it exists
+            if (prefixTooltipText != null && !prefixTooltipText.isEmpty()) {
+                Component tooltipComponent = parseColors(prefixTooltipText);
+                prefixComponent = prefixComponent.withStyle(style -> 
+                    style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, tooltipComponent))
+                );
+            }
+            
+            fullNameComponent.append(prefixComponent);
+            
+            // Add a space after prefix if it doesn't end with one
+            if (!luckPermsPrefix.endsWith(" ")) {
+                fullNameComponent.append(Component.literal(" "));
+            }
+        }
+        
+        // Parse the name with its color prefix
+        MutableComponent nameComponent = (MutableComponent) parseColors(colorPrefix + nameToShow);
+        
+        // Apply ClickEvent and original HoverEvent (if any) only to the name component
         final HoverEvent finalHoverEvent = hoverEvent; // effectively final for lambda
         nameComponent = nameComponent.withStyle(style -> {
             Style updatedStyle = style.withClickEvent(clickEvent);
@@ -245,8 +286,10 @@ public class ChatFormattingUtils {
             }
             return updatedStyle;
         });
+        
+        fullNameComponent.append(nameComponent);
 
-        return nameComponent;
+        return fullNameComponent;
     }
 
     /**

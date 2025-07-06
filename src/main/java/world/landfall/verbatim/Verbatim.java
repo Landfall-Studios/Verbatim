@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import world.landfall.verbatim.command.VerbatimCommands;
 import world.landfall.verbatim.discord.DiscordBot;
 import world.landfall.verbatim.util.PermissionService;
+import world.landfall.verbatim.util.PrefixService;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.Level;
 
@@ -25,6 +26,7 @@ public class Verbatim {
     public static final String MODID = "verbatim";
     public static final Logger LOGGER = LogUtils.getLogger();
     public static PermissionService permissionService;
+    public static PrefixService prefixService;
 
     @SuppressWarnings("removal")
     public Verbatim() {
@@ -40,6 +42,7 @@ public class Verbatim {
         MinecraftForge.EVENT_BUS.addListener(this::onServerStopping);
         
         permissionService = new PermissionService();
+        prefixService = new PrefixService();
     }
 
     private void commonSetup(final FMLCommonSetupEvent event) {
