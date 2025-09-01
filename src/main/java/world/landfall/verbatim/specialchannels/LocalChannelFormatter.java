@@ -145,6 +145,11 @@ public class LocalChannelFormatter {
             localActionText = "whispers:";
             // Remove the * since it's a formatting indicator, not natural punctuation
             messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 1);
+        } else if (originalMessageContent.endsWith("?")) {
+            effectiveRange = 50;
+            localActionText = "asks:";
+            // Keep the ? in the message since it's natural punctuation
+            messageAfterSuffixRemoval = originalMessageContent;
         } else if (originalMessageContent.endsWith("$")) {
             effectiveRange = 3;
             localActionText = "mutters:";

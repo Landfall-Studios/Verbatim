@@ -77,3 +77,18 @@ Key areas to configure:
 Verbatim attempts to use LuckPerms for permission checking if it's available on the server. If LuckPerms is not found, it falls back to vanilla Minecraft's operator (OP) levels.
 
 *   **Channel Access:** Channel permissions are defined in the `permission` field for each channel in the configuration file (e.g., `verbatim.channel.staff`). If a permission is set, players will need that node to join/speak in the channel (unless it's `alwaysOn`).
+
+### LuckPerms Prefix and Tooltip Configuration
+
+Verbatim supports displaying player prefixes and tooltips from LuckPerms metadata:
+
+*   **Setting a Prefix:**
+    *   For users: `/lp user <username> meta setprefix <priority> "<prefix>"`
+    *   For groups: `/lp group <groupname> meta setprefix <priority> "<prefix>"`
+    *   Example: `/lp user Steve meta setprefix 100 "&c[Admin] "`
+
+*   **Setting a Prefix Tooltip:**
+    *   For users: `/lp user <username> meta set prefix_tooltip.0 "<tooltip text>"`
+    *   For groups: `/lp group <groupname> meta set prefix_tooltip.0 "<tooltip text>"`
+    *   Example: `/lp group admin meta set prefix_tooltip.0 "Server Administrator"`
+    *   Note: You can use `prefix_tooltip.0` through `prefix_tooltip.9` to set multiple tooltips with different priorities.
