@@ -72,6 +72,7 @@ public class ChatEvents {
                 DiscordBot.sendPlayerConnectionStatusToDiscord(player, false);
             }
             ChatChannelManager.playerLoggedOut(player);
+            world.landfall.verbatim.util.NicknameService.onPlayerLogout(player.getUUID());
         }
     }
 
@@ -254,7 +255,7 @@ public class ChatEvents {
                     finalMessage = Component.empty();
                     finalMessage.append(ChatFormattingUtils.parseColors(finalTargetChannel.displayPrefix));
                     finalMessage.append(Component.literal(" "));
-                    Component playerNameComponent = ChatFormattingUtils.createPlayerNameComponent(sender, finalTargetChannel.nameColor, false);
+                    Component playerNameComponent = ChatFormattingUtils.createPlayerNameComponent(sender, finalTargetChannel.nameColor, false, finalTargetChannel.nameStyle);
                     finalMessage.append(playerNameComponent);
                     finalMessage.append(ChatFormattingUtils.parseColors(finalTargetChannel.separatorColor + finalTargetChannel.separator));
                     finalMessage.append(ChatFormattingUtils.parsePlayerInputWithPermissions(finalTargetChannel.messageColor, messageContent, sender));

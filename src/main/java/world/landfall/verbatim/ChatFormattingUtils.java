@@ -69,13 +69,14 @@ public class ChatFormattingUtils {
      * Creates a player name component that shows the display name with hover text showing the username
      * when they differ. For DMs, always uses the username without hover.
      * Now includes LuckPerms prefix/suffix support and role tooltips.
-     * 
+     *
      * @param player The player whose name to display
      * @param colorPrefix The color/formatting prefix to apply (e.g., "&e" or "&c&l")
      * @param isDM Whether this is for a direct message (if true, always uses username)
+     * @param nameStyle The style of name to display (null for legacy behavior - use displayName for channels, username for DMs)
      * @return A component with the appropriate name and hover text
      */
-    public static Component createPlayerNameComponent(ServerPlayer player, String colorPrefix, boolean isDM) {
+    public static Component createPlayerNameComponent(ServerPlayer player, String colorPrefix, boolean isDM, world.landfall.verbatim.NameStyle nameStyle) {
         String username = player.getName().getString();
         String displayName = player.getDisplayName().getString(); // Get raw display name
         String strippedDisplayName = stripFormattingCodes(displayName); // Strip codes for comparison and potential use
@@ -84,15 +85,30 @@ public class ChatFormattingUtils {
         HoverEvent hoverEvent = null;
 
         String nameToShow;
-        
+
         if (isDM) {
             // For DMs, always show the username, apply color prefix.
             nameToShow = username;
+        } else if (nameStyle != null) {
+            // Use the specified name style
+            nameToShow = world.landfall.verbatim.util.NicknameService.getNameForStyle(player, nameStyle);
+
+            // Set up hover event based on the name style
+            if (nameStyle == world.landfall.verbatim.NameStyle.NICKNAME) {
+                String nickname = world.landfall.verbatim.util.NicknameService.getNickname(player);
+                if (nickname != null && !nickname.trim().isEmpty()) {
+                    hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                            Component.literal("Username: " + username).withStyle(ChatFormatting.GRAY));
+                }
+            } else if (nameStyle == world.landfall.verbatim.NameStyle.DISPLAY_NAME && !username.equals(strippedDisplayName)) {
+                hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                        Component.literal("Username: " + username).withStyle(ChatFormatting.GRAY));
+            }
         } else {
-            // For channels, if display name (stripped) is different from username, use it and set hover.
+            // Legacy behavior: For channels, if display name (stripped) is different from username, use it and set hover.
             if (!username.equals(strippedDisplayName)) {
                 nameToShow = strippedDisplayName;
-                hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT, 
+                hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT,
                                         Component.literal("Username: " + username).withStyle(ChatFormatting.GRAY));
             } else {
                 // Otherwise, just use the username.
@@ -156,6 +172,19 @@ public class ChatFormattingUtils {
         fullNameComponent.append(nameComponent);
 
         return fullNameComponent;
+    }
+
+    /**
+     * Creates a player name component with legacy behavior (for backward compatibility).
+     * Uses displayName for channels and username for DMs.
+     *
+     * @param player The player whose name to display
+     * @param colorPrefix The color/formatting prefix to apply (e.g., "&e" or "&c&l")
+     * @param isDM Whether this is for a direct message (if true, always uses username)
+     * @return A component with the appropriate name and hover text
+     */
+    public static Component createPlayerNameComponent(ServerPlayer player, String colorPrefix, boolean isDM) {
+        return createPlayerNameComponent(player, colorPrefix, isDM, null);
     }
 
     /**

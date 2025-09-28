@@ -194,7 +194,7 @@ public class LocalChannelFormatter {
         finalMessage.append(Component.literal(" "));
         
         // Add player name
-        Component playerNameComponent = ChatFormattingUtils.createPlayerNameComponent(sender, channelConfig.nameColor, false);
+        Component playerNameComponent = ChatFormattingUtils.createPlayerNameComponent(sender, channelConfig.nameColor, false, channelConfig.nameStyle);
         finalMessage.append(playerNameComponent);
         finalMessage.append(Component.literal(" "));
         

@@ -38,9 +38,10 @@ public class ChatChannelManager {
         public final boolean alwaysOn; // If true, cannot be left via /leave and permission is IGNORED (public)
         public final boolean mature; // If true, shows mature content warning when joining
         public final Optional<String> specialChannelType; // For special channel behaviors like "local"
+        public final NameStyle nameStyle; // How player names should be displayed in this channel
 
         public ChannelConfig(String name, String displayPrefix, String shortcut, String permission, Number range,
-                             String nameColor, String separator, String separatorColor, String messageColor, Boolean alwaysOn, Boolean mature, String specialChannelType) {
+                             String nameColor, String separator, String separatorColor, String messageColor, Boolean alwaysOn, Boolean mature, String specialChannelType, String nameStyle) {
             this.name = name;
             this.displayPrefix = displayPrefix;
             this.shortcut = shortcut;
@@ -55,6 +56,7 @@ public class ChatChannelManager {
             this.separator = (separator == null || separator.isEmpty()) ? ": " : separator;
             this.separatorColor = (separatorColor == null || separatorColor.isEmpty()) ? this.messageColor : separatorColor;
             this.specialChannelType = (specialChannelType == null || specialChannelType.isEmpty()) ? Optional.empty() : Optional.of(specialChannelType);
+            this.nameStyle = NameStyle.fromConfigValue(nameStyle);
         }
     }
 
@@ -83,10 +85,11 @@ public class ChatChannelManager {
                 Boolean alwaysOn = channelConf.getOptional("alwaysOn").map(v -> (Boolean)v).orElse(false);
                 Boolean mature = channelConf.getOptional("mature").map(v -> (Boolean)v).orElse(false);
                 String specialChannelType = channelConf.getOptional("specialChannelType").map(String::valueOf).orElse(null);
+                String nameStyle = channelConf.getOptional("nameStyle").map(String::valueOf).orElse(null);
 
                 if (name != null && !name.isEmpty() && displayPrefix != null && shortcut != null && !shortcut.isEmpty()) {
                     ChannelConfig parsedConfig = new ChannelConfig(name, displayPrefix, shortcut, permissionStr, range,
-                                                                 nameColor, separator, separatorColor, messageColor, alwaysOn, mature, specialChannelType);
+                                                                 nameColor, separator, separatorColor, messageColor, alwaysOn, mature, specialChannelType, nameStyle);
                     if (channelConfigsByName.containsKey(name)) {
                         Verbatim.LOGGER.warn("Duplicate channel name in config: '{}'. Ignoring subsequent definition.", name);
                         continue;

@@ -18,6 +18,7 @@ import net.minecraft.server.players.PlayerList;
 import world.landfall.verbatim.ChatChannelManager;
 import world.landfall.verbatim.ChatFormattingUtils;
 import world.landfall.verbatim.Verbatim;
+import world.landfall.verbatim.util.NicknameService;
 import net.minecraft.network.chat.MutableComponent;
 
 import java.util.Collection;
@@ -246,6 +247,43 @@ public class VerbatimCommands {
                 )
             );
         dispatcher.register(chKickCommand);
+
+        // Nickname command: /nick [nickname]
+        LiteralArgumentBuilder<CommandSourceStack> nickCommand = Commands.literal("nick")
+            .requires(source -> {
+                if (source.getEntity() instanceof ServerPlayer player) {
+                    return Verbatim.permissionService.hasPermission(player, NicknameService.PERM_NICK, 0);
+                }
+                return false; // Only players can use /nick
+            })
+            // /nick clear - clear nickname
+            .then(Commands.literal("clear")
+                .executes(context -> {
+                    if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
+                        context.getSource().sendFailure(Component.literal("Players only."));
+                        return 0;
+                    }
+                    return executeNickClear(player);
+                }))
+            // /nick <nickname> - set nickname
+            .then(Commands.argument("nickname", StringArgumentType.greedyString())
+                .executes(context -> {
+                    if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
+                        context.getSource().sendFailure(Component.literal("Players only."));
+                        return 0;
+                    }
+                    String nickname = StringArgumentType.getString(context, "nickname");
+                    return executeNickSet(player, nickname);
+                }))
+            // /nick - show current nickname
+            .executes(context -> {
+                if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
+                    context.getSource().sendFailure(Component.literal("Players only."));
+                    return 0;
+                }
+                return executeNickShow(player);
+            });
+        dispatcher.register(nickCommand);
     }
 
     private static int executeCustomListCommand(CommandSourceStack source) {
@@ -497,5 +535,51 @@ public class VerbatimCommands {
              }
         }
         return success ? 1 : 0;
+    }
+
+    private static int executeNickShow(ServerPlayer player) {
+        String currentNickname = NicknameService.getNickname(player);
+        if (currentNickname != null) {
+            MutableComponent message = Component.literal("Your current nickname: ").withStyle(ChatFormatting.YELLOW);
+            message.append(ChatFormattingUtils.parseColors(currentNickname));
+            player.sendSystemMessage(message);
+        } else {
+            player.sendSystemMessage(Component.literal("You don't have a nickname set.").withStyle(ChatFormatting.YELLOW));
+        }
+        return 1;
+    }
+
+    private static int executeNickSet(ServerPlayer player, String nickname) {
+        if (nickname.length() > 64) { // Reasonable length limit
+            player.sendSystemMessage(Component.literal("Nickname is too long. Maximum 64 characters.").withStyle(ChatFormatting.RED));
+            return 0;
+        }
+
+        String processedNickname = NicknameService.setNickname(player, nickname);
+
+        if (processedNickname != null) {
+            MutableComponent message = Component.literal("Nickname set to: ").withStyle(ChatFormatting.GREEN);
+            message.append(ChatFormattingUtils.parseColors(processedNickname));
+            player.sendSystemMessage(message);
+
+            // Show a note about formatting permissions if they were stripped
+            if (!processedNickname.equals(nickname)) {
+                player.sendSystemMessage(Component.literal("Note: Color codes were removed due to missing permissions.").withStyle(ChatFormatting.GRAY));
+            }
+        } else {
+            player.sendSystemMessage(Component.literal("Failed to set nickname.").withStyle(ChatFormatting.RED));
+            return 0;
+        }
+        return 1;
+    }
+
+    private static int executeNickClear(ServerPlayer player) {
+        if (NicknameService.hasNickname(player)) {
+            NicknameService.clearNickname(player);
+            player.sendSystemMessage(Component.literal("Nickname cleared.").withStyle(ChatFormatting.GREEN));
+        } else {
+            player.sendSystemMessage(Component.literal("You don't have a nickname set.").withStyle(ChatFormatting.YELLOW));
+        }
+        return 1;
     }
 } 

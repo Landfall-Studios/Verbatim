@@ -46,7 +46,8 @@ public class VerbatimConfig {
             "  messageColor: String (optional) - Color for the message content (e.g., \"&f\"). Defaults to white.",
             "  alwaysOn: Boolean (optional) - If true, players cannot '/channel leave' this channel. Defaults to false.",
             "  specialChannelType: String (optional) - Special behavior type (e.g., \"local\" for roleplay features). Defaults to none.",
-            "  mature: Boolean (optional) - If true, shows a mature content warning when joining. Defaults to false."
+            "  mature: Boolean (optional) - If true, shows a mature content warning when joining. Defaults to false.",
+            "  nameStyle: String (optional) - Name display style (\"displayName\", \"username\", \"nickname\"). Defaults to \"displayName\"."
         ).define("channelsInfo", "");
 
         Supplier<List<? extends UnmodifiableConfig>> defaultChannelsSupplier = () -> {
@@ -64,6 +65,7 @@ public class VerbatimConfig {
             globalChannel.set("messageColor", "&f");
             globalChannel.set("alwaysOn", true);
             globalChannel.set("mature", false);
+            globalChannel.set("nameStyle", "displayName");
             defaults.add(globalChannel);
 
             CommentedConfig localChannel = TomlFormat.newConfig();
@@ -79,6 +81,7 @@ public class VerbatimConfig {
             localChannel.set("alwaysOn", true);
             localChannel.set("specialChannelType", "local");
             localChannel.set("mature", false);
+            localChannel.set("nameStyle", "displayName");
             defaults.add(localChannel);
 
             CommentedConfig staffChannel = TomlFormat.newConfig();
@@ -93,6 +96,7 @@ public class VerbatimConfig {
             staffChannel.set("messageColor", "&d");
             staffChannel.set("alwaysOn", false);
             staffChannel.set("mature", false);
+            staffChannel.set("nameStyle", "displayName");
             defaults.add(staffChannel);
 
             return defaults;
@@ -157,6 +161,10 @@ public class VerbatimConfig {
             }
             if (config.contains("mature") && !(config.get("mature") instanceof Boolean)) {
                 Verbatim.LOGGER.warn("[VerbatimConfigValidator] Channel '{}': 'mature' is not a Boolean.", entryName);
+                return false;
+            }
+            if (config.contains("nameStyle") && !(config.get("nameStyle") instanceof String)) {
+                Verbatim.LOGGER.warn("[VerbatimConfigValidator] Channel '{}': 'nameStyle' is not a String.", entryName);
                 return false;
             }
             return true;
