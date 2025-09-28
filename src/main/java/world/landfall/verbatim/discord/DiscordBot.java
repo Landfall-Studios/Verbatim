@@ -146,6 +146,13 @@ public class DiscordBot {
         return Color.getHSBColor(hue, 0.7f, 0.85f);
     }
 
+    private static String getPlayerAvatarUrl(ServerPlayer player) {
+        String username = player.getName().getString();
+
+        // Use Minotar with username for better reliability
+        return "https://minotar.net/avatar/" + username;
+    }
+
     public static void sendPlayerChatMessageToDiscord(ServerPlayer player, String messageContent) {
         if (!isEnabled()) {
             return;
@@ -163,9 +170,8 @@ public class DiscordBot {
             String cleanMessageContent = ChatFormattingUtils.stripFormattingCodes(messageContent);
 
             if (useEmbedMode) {
-                String playerUUID = player.getUUID().toString().replace("-", "");
-                String avatarUrl = "https://minotar.net/avatar/" + playerUUID;
-                
+                String avatarUrl = getPlayerAvatarUrl(player);
+
                 String authorName = username;
                 if (!username.equals(strippedDisplayName)) {
                     authorName = strippedDisplayName + " (" + username + ")";
@@ -208,8 +214,7 @@ public class DiscordBot {
             }
 
             if (useEmbedMode) {
-                String playerUUID = player.getUUID().toString().replace("-", "");
-                String avatarUrl = "https://minotar.net/avatar/" + playerUUID + "/100";
+                String avatarUrl = getPlayerAvatarUrl(player);
 
                 EmbedBuilder embed = new EmbedBuilder();
                 embed.setColor(joined ? new Color(0x4CAF50) : new Color(0xF44336));
