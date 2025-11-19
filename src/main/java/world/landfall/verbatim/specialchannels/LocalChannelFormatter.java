@@ -3,9 +3,11 @@ package world.landfall.verbatim.specialchannels;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.server.level.ServerPlayer;
 import world.landfall.verbatim.ChatChannelManager;
 import world.landfall.verbatim.ChatFormattingUtils;
+import world.landfall.verbatim.Verbatim;
 
 import java.util.List;
 import java.util.Optional;
@@ -93,7 +95,7 @@ public class LocalChannelFormatter {
                 } else {
                     // Append original character with the channel's default message color
                     // We assume channelMessageColorString is like "&7" or "&c&l"
-                    reconstructedMessage.append(ChatFormattingUtils.parseColors(channelMessageColorString + c));
+                    reconstructedMessage.append(ChatFormattingUtils.parseColors(channelMessageColorString + c).toMinecraft());
                 }
             }
         }
@@ -171,14 +173,14 @@ public class LocalChannelFormatter {
             // Create OOC format
             MutableComponent finalMessage = Component.empty();
             finalMessage.append(Component.literal("[OOC] ").withStyle(ChatFormatting.DARK_GRAY));
-            
+
             // Add player name
-            String playerName = sender.getName().getString();
-            String displayName = sender.getDisplayName().getString();
-            
+            String playerName = Verbatim.gameContext.getPlayerUsername(sender);
+            String displayName = Verbatim.gameContext.getPlayerDisplayName(sender);
+
             finalMessage.append(Component.literal(playerName + " (" + displayName + "): ").withStyle(ChatFormatting.DARK_GRAY));
             // Special channels should not use permission-based parsing - use basic parsing
-            finalMessage.append(ChatFormattingUtils.parseColors("&8" + messageAfterSuffixRemoval.trim()));
+            finalMessage.append(ChatFormattingUtils.parseColors("&8" + messageAfterSuffixRemoval.trim()).toMinecraft());
             
             return Optional.of(new FormattedMessageDetails(finalMessage, effectiveRange, false, "&8")); // Use dark gray for any obscuring
         }
@@ -188,16 +190,16 @@ public class LocalChannelFormatter {
 
         // Build the formatted message
         MutableComponent finalMessage = Component.empty();
-        
+
         // Add channel prefix
-        finalMessage.append(ChatFormattingUtils.parseColors(channelConfig.displayPrefix));
+        finalMessage.append(ChatFormattingUtils.parseColors(channelConfig.displayPrefix).toMinecraft());
         finalMessage.append(Component.literal(" "));
-        
+
         // Add player name
-        Component playerNameComponent = ChatFormattingUtils.createPlayerNameComponent(sender, channelConfig.nameColor, false, channelConfig.nameStyle);
+        Component playerNameComponent = ChatFormattingUtils.createPlayerNameComponent(sender, channelConfig.nameColor, false, channelConfig.nameStyle).toMinecraft();
         finalMessage.append(playerNameComponent);
         finalMessage.append(Component.literal(" "));
-        
+
         // Add action text (if any)
         if (!localActionText.isEmpty()) {
             finalMessage.append(Component.literal(localActionText));
@@ -208,10 +210,10 @@ public class LocalChannelFormatter {
         if (applyPlusStyleFormatting) {
             formatPlusStyleMessage(finalMessage, actualMessageContent, channelConfig.messageColor);
             // For roleplay, messageColorForObscuring is not used, so pass null
-            return Optional.of(new FormattedMessageDetails(finalMessage, effectiveRange, true, null)); 
+            return Optional.of(new FormattedMessageDetails(finalMessage, effectiveRange, true, null));
         } else {
             // Standard formatting for other local types
-            finalMessage.append(ChatFormattingUtils.parseColors(channelConfig.messageColor + actualMessageContent));
+            finalMessage.append(ChatFormattingUtils.parseColors(channelConfig.messageColor + actualMessageContent).toMinecraft());
             // For standard local, pass the channel's message color for obscuring logic
             return Optional.of(new FormattedMessageDetails(finalMessage, effectiveRange, false, channelConfig.messageColor));
         }
@@ -224,6 +226,9 @@ public class LocalChannelFormatter {
         boolean inQuote = false;
         StringBuilder currentSegment = new StringBuilder();
 
+        Style grayStyle = Style.EMPTY.withColor(ChatFormatting.GRAY);
+        Style whiteItalicStyle = Style.EMPTY.withColor(ChatFormatting.WHITE).withItalic(true);
+
         for (int i = 0; i < messageContent.length(); i++) {
             char c = messageContent.charAt(i);
             if (c == '"') {
@@ -231,10 +236,10 @@ public class LocalChannelFormatter {
                 if (currentSegment.length() > 0) {
                     if (inQuote) {
                         // Segment was inside quotes, now ending - use gray color
-                        finalMessage.append(Component.literal(currentSegment.toString()).copy().withStyle(ChatFormatting.GRAY));
+                        finalMessage.append(ChatFormattingUtils.makeLinksClickable(currentSegment.toString(), grayStyle));
                     } else {
                         // Segment was outside quotes, now starting quote - use white italicized
-                        finalMessage.append(Component.literal(currentSegment.toString()).copy().withStyle(ChatFormatting.WHITE, ChatFormatting.ITALIC));
+                        finalMessage.append(ChatFormattingUtils.makeLinksClickable(currentSegment.toString(), whiteItalicStyle));
                     }
                     currentSegment.setLength(0);
                 }
@@ -250,10 +255,10 @@ public class LocalChannelFormatter {
         if (currentSegment.length() > 0) {
             if (inQuote) {
                 // Remainder is inside quotes - use gray
-                finalMessage.append(Component.literal(currentSegment.toString()).copy().withStyle(ChatFormatting.GRAY));
+                finalMessage.append(ChatFormattingUtils.makeLinksClickable(currentSegment.toString(), grayStyle));
             } else {
                 // Remainder is outside quotes - use white italicized
-                finalMessage.append(Component.literal(currentSegment.toString()).copy().withStyle(ChatFormatting.WHITE, ChatFormatting.ITALIC));
+                finalMessage.append(ChatFormattingUtils.makeLinksClickable(currentSegment.toString(), whiteItalicStyle));
             }
         }
     }

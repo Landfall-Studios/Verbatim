@@ -1,6 +1,7 @@
 package world.landfall.verbatim.specialchannels;
 
 import net.minecraft.network.chat.MutableComponent;
+import world.landfall.verbatim.context.GameComponent;
 
 /**
  * Data class to hold the results of special channel message formatting.
@@ -24,10 +25,10 @@ public class FormattedMessageDetails {
      */
     public MutableComponent getMessageForDistance(double distanceSquared) {
         if (effectiveRange < 0) return formattedMessage.copy(); // Global messages, no obscuring
-        
+
         double distance = Math.sqrt(distanceSquared);
         if (distance <= effectiveRange) return formattedMessage.copy(); // Within clear range
-        
+
         // Calculate fade distance using the same logic as LocalChannelFormatter
         double fadeDistance;
         if (effectiveRange <= 15) {
@@ -37,18 +38,34 @@ public class FormattedMessageDetails {
             // For talking (50) and shouting (100), use a smaller multiplier with a cap
             fadeDistance = Math.min(30, effectiveRange * 0.6); // MAX_FADE_DISTANCE = 30
         }
-        
+
         if (distance <= effectiveRange + fadeDistance) {
             // This will internally check isRoleplayMessage and not obscure if true
             return LocalChannelFormatter.createDistanceObscuredMessage(
-                formattedMessage, 
-                distanceSquared, 
-                effectiveRange, 
-                isRoleplayMessage, 
+                formattedMessage,
+                distanceSquared,
+                effectiveRange,
+                isRoleplayMessage,
                 channelMessageColorForObscuring
             );
         }
-        
+
         return null; // Too far to receive message
+    }
+
+    /**
+     * Gets the formatted message as a GameComponent.
+     */
+    public GameComponent getFormattedMessageAsGameComponent() {
+        return world.landfall.verbatim.context.GameComponentImpl.wrap(formattedMessage);
+    }
+
+    /**
+     * Gets the appropriate message component for a recipient at the given distance as a GameComponent.
+     */
+    public GameComponent getMessageForDistanceAsGameComponent(double distanceSquared) {
+        MutableComponent result = getMessageForDistance(distanceSquared);
+        if (result == null) return null;
+        return world.landfall.verbatim.context.GameComponentImpl.wrap(result);
     }
 } 

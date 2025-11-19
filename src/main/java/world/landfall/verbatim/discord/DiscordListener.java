@@ -17,10 +17,12 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.players.PlayerList;
 import net.minecraft.ChatFormatting;
-import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import world.landfall.verbatim.Verbatim;
 import world.landfall.verbatim.VerbatimConfig;
 import world.landfall.verbatim.ChatFormattingUtils;
+import world.landfall.verbatim.context.GameColor;
+import world.landfall.verbatim.context.GameComponent;
+import static world.landfall.verbatim.context.GameText.*;
 
 import javax.annotation.Nonnull;
 import java.util.List;
@@ -68,85 +70,83 @@ public class DiscordListener extends ListenerAdapter {
             authorName = author.getName();
         }
 
-        String prefixStr = DiscordBot.getDiscordMessagePrefix(); 
+        String prefixStr = DiscordBot.getDiscordMessagePrefix();
         if (prefixStr == null) prefixStr = "";
-        
-        String separatorStr = DiscordBot.getDiscordMessageSeparator();
-        if (separatorStr == null) separatorStr = ": "; 
 
-        MutableComponent finalMessage = Component.empty();
+        String separatorStr = DiscordBot.getDiscordMessageSeparator();
+        if (separatorStr == null) separatorStr = ": ";
+
+        GameComponent finalMessage = empty();
         int currentLength = 0;
         final int MAX_LENGTH = 256;
         final String TRUNCATION_MARKER = "...";
         final int TRUNCATION_MARKER_LEN = TRUNCATION_MARKER.length();
 
         if (!prefixStr.isEmpty()) {
-            Component prefixComponent = ChatFormattingUtils.parseColors(prefixStr + " ");
-            finalMessage.append(prefixComponent);
+            GameComponent prefixComponent = ChatFormattingUtils.parseColors(prefixStr + " ");
+            finalMessage = finalMessage.append(prefixComponent);
             currentLength += ChatFormattingUtils.stripFormattingCodes(prefixComponent.getString()).length();
         }
-        
-        finalMessage.append(Component.literal(authorName));
+
+        finalMessage = finalMessage.append(text(authorName));
         currentLength += authorName.length();
-        
-        finalMessage.append(ChatFormattingUtils.parseColors(separatorStr));
+
+        finalMessage = finalMessage.append(ChatFormattingUtils.parseColors(separatorStr));
         currentLength += ChatFormattingUtils.stripFormattingCodes(separatorStr).length();
-        
+
         // Calculate remaining length for content
         int remainingLength = MAX_LENGTH - currentLength - TRUNCATION_MARKER_LEN;
-        
+
         // Handle message content first
         String contentStr = processedContent.trim();
         if (!contentStr.isEmpty()) {
             if (contentStr.length() > remainingLength) {
                 contentStr = contentStr.substring(0, remainingLength);
-                finalMessage.append(Component.literal(contentStr));
-                finalMessage.append(Component.literal(TRUNCATION_MARKER).withStyle(ChatFormatting.DARK_GRAY));
+                finalMessage = finalMessage.append(text(contentStr));
+                finalMessage = finalMessage.append(text(TRUNCATION_MARKER).withColor(GameColor.DARK_GRAY));
                 remainingLength = 0;
             } else {
-                finalMessage.append(Component.literal(contentStr));
+                finalMessage = finalMessage.append(text(contentStr));
                 remainingLength -= contentStr.length();
                 if (!event.getMessage().getAttachments().isEmpty() && remainingLength > 1) {
-                    finalMessage.append(Component.literal(" "));
+                    finalMessage = finalMessage.append(text(" "));
                     remainingLength--;
                 }
             }
         }
-        
+
         // Handle attachments if we have room
         if (remainingLength > 0) {
             List<Message.Attachment> attachments = event.getMessage().getAttachments();
             for (Message.Attachment attachment : attachments) {
                 String fileName = attachment.getFileName();
                 String proxyUrl = attachment.getProxyUrl();
-                
+
                 // Check if we have room for this attachment (+2 for brackets)
                 if (fileName.length() + 2 > remainingLength) {
-                    finalMessage.append(Component.literal(TRUNCATION_MARKER).withStyle(ChatFormatting.DARK_GRAY));
+                    finalMessage = finalMessage.append(text(TRUNCATION_MARKER).withColor(GameColor.DARK_GRAY));
                     break;
                 }
-                
-                MutableComponent attachmentComponent = Component.literal("[" + fileName + "]")
-                    .withStyle(style -> style
-                        .withColor(ChatFormatting.DARK_GRAY)
-                        .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, proxyUrl))
-                        .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, 
-                            Component.literal("Click to open " + fileName))));
-                
-                finalMessage.append(attachmentComponent);
+
+                GameComponent attachmentComponent = text("[" + fileName + "]")
+                    .withColor(GameColor.DARK_GRAY)
+                    .withClickOpenUrl(proxyUrl)
+                    .withHoverText("Click to open " + fileName);
+
+                finalMessage = finalMessage.append(attachmentComponent);
                 remainingLength -= (fileName.length() + 2);
-                
+
                 // Add space if we have more attachments and room
                 if (attachments.indexOf(attachment) < attachments.size() - 1 && remainingLength > 1) {
-                    finalMessage.append(Component.literal(" "));
+                    finalMessage = finalMessage.append(text(" "));
                     remainingLength--;
                 }
             }
         }
 
-        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+        MinecraftServer server = Verbatim.gameContext.getServer();
         if (server != null) {
-            server.getPlayerList().broadcastSystemMessage(finalMessage, false);
+            Verbatim.gameContext.broadcastMessage(finalMessage, false);
             Verbatim.LOGGER.debug("[Discord -> Game] {} ({}) relayed to game chat.", authorName, author.getId());
         } else {
             Verbatim.LOGGER.warn("[Verbatim Discord] MinecraftServer instance is null, cannot send message to game.");
@@ -161,14 +161,13 @@ public class DiscordListener extends ListenerAdapter {
         }
 
         if (event.getName().equals("list")) {
-            MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
+            MinecraftServer server = Verbatim.gameContext.getServer();
             if (server == null) {
                 event.reply("Could not connect to the Minecraft server to fetch the player list.").setEphemeral(true).queue();
                 return;
             }
 
-            PlayerList mcPlayerList = server.getPlayerList();
-            List<ServerPlayer> onlinePlayers = mcPlayerList.getPlayers();
+            List<ServerPlayer> onlinePlayers = Verbatim.gameContext.getAllOnlinePlayers();
 
             if (onlinePlayers.isEmpty()) {
                 event.reply("There are no players currently online on the Minecraft server.").setEphemeral(true).queue();
@@ -177,8 +176,8 @@ public class DiscordListener extends ListenerAdapter {
 
             String playerListString = onlinePlayers.stream()
                 .map(player -> {
-                    String username = player.getName().getString();
-                    String strippedDisplayName = ChatFormattingUtils.stripFormattingCodes(player.getDisplayName().getString());
+                    String username = Verbatim.gameContext.getPlayerUsername(player);
+                    String strippedDisplayName = ChatFormattingUtils.stripFormattingCodes(Verbatim.gameContext.getPlayerDisplayName(player));
                     if (!username.equals(strippedDisplayName)) {
                         return strippedDisplayName + " (" + username + ")";
                     }

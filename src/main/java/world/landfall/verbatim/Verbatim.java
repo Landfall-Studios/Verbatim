@@ -12,6 +12,8 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import org.slf4j.Logger;
 import world.landfall.verbatim.command.VerbatimCommands;
+import world.landfall.verbatim.context.GameContext;
+import world.landfall.verbatim.context.GameContextImpl;
 import world.landfall.verbatim.discord.DiscordBot;
 import world.landfall.verbatim.util.PermissionService;
 import world.landfall.verbatim.util.PrefixService;
@@ -23,6 +25,7 @@ public class Verbatim {
 
     public static final String MODID = "verbatim";
     public static final Logger LOGGER = LogUtils.getLogger();
+    public static GameContext gameContext;
     public static PermissionService permissionService;
     public static PrefixService prefixService;
 
@@ -35,7 +38,8 @@ public class Verbatim {
 
         NeoForge.EVENT_BUS.register(this);
         NeoForge.EVENT_BUS.register(ChatEvents.class);
-        
+
+        gameContext = new GameContextImpl();
         permissionService = new PermissionService();
         prefixService = new PrefixService();
     }

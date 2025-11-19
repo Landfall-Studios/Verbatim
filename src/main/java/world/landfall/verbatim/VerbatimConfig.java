@@ -24,6 +24,12 @@ public class VerbatimConfig {
     public static final ModConfigSpec.ConfigValue<String> DISCORD_MESSAGE_SEPARATOR;
     public static final ModConfigSpec.BooleanValue DISCORD_BOT_ENABLED;
     public static final ModConfigSpec.BooleanValue DISCORD_USE_EMBED_MODE;
+    public static final ModConfigSpec.ConfigValue<String> DISCORD_NAME_STYLE;
+
+    // Join/Leave Message Config
+    public static final ModConfigSpec.BooleanValue CUSTOM_JOIN_LEAVE_MESSAGES_ENABLED;
+    public static final ModConfigSpec.ConfigValue<String> JOIN_MESSAGE_FORMAT;
+    public static final ModConfigSpec.ConfigValue<String> LEAVE_MESSAGE_FORMAT;
 
     static {
         BUILDER.push("Verbatim Mod Configuration");
@@ -209,6 +215,39 @@ public class VerbatimConfig {
                 "Enable to send Minecraft chat to Discord as rich embeds instead of plain text.",
                 "Embeds will include the player's avatar and a color derived from their UUID."
         ).define("discordUseEmbedMode", false);
+
+        DISCORD_NAME_STYLE = BUILDER.comment(
+                "Name display style for Discord messages. Options:",
+                "  username - Shows only the username without parentheses",
+                "  displayName - Shows displayName with (username) when they differ",
+                "  nickname - Shows nickname with (username) when a nickname exists"
+        ).define("discordNameStyle", "username");
+
+        BUILDER.pop();
+
+        BUILDER.push("Join/Leave Messages");
+        BUILDER.comment(
+                "Customize player join and leave messages. Placeholders:",
+                "  {player} - player's display name",
+                "  {username} - player's username",
+                "  {nickname} - player's nickname (falls back to display name if none set)"
+        );
+
+        CUSTOM_JOIN_LEAVE_MESSAGES_ENABLED = BUILDER.comment(
+                "Enable custom join/leave messages.",
+                "Note: Vanilla join/leave messages will still appear alongside custom messages.",
+                "Suppressing vanilla messages is not possible without Mixins."
+        ).define("customJoinLeaveMessagesEnabled", false);
+
+        JOIN_MESSAGE_FORMAT = BUILDER.comment(
+                "Format for join messages. Supports & color codes.",
+                "Example: '&a[+]&r {player}' or '&7[&a+&7] &f{nickname}'"
+        ).define("joinMessageFormat", "&a[+]&r {nickname}");
+
+        LEAVE_MESSAGE_FORMAT = BUILDER.comment(
+                "Format for leave messages. Supports & color codes.",
+                "Example: '&c[-]&r {player}' or '&7[&c-&7] &f{nickname}'"
+        ).define("leaveMessageFormat", "&c[-]&r {nickname}");
 
         BUILDER.pop();
         SPEC = BUILDER.build();

@@ -16,6 +16,8 @@ import net.minecraft.server.MinecraftServer;
 import java.util.ArrayList;
 import world.landfall.verbatim.chat.FocusTarget;
 import world.landfall.verbatim.chat.ChatFocus;
+import world.landfall.verbatim.context.GameColor;
+import static world.landfall.verbatim.context.GameText.*;
 
 public class ChatChannelManager {
     // Flag to track if the manager has been properly initialized
@@ -172,10 +174,10 @@ public class ChatChannelManager {
                 }
             }
         } catch (Exception e) {
-            Verbatim.LOGGER.error("[ChatChannelManager] Error loading player channel state for {}: {}", player.getName().getString(), e.getMessage());
+            Verbatim.LOGGER.error("[ChatChannelManager] Error loading player channel state for {}: {}", Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
         }
 
-        joinedChannels.put(player.getUUID(), loadedJoinedChannels);
+        joinedChannels.put(Verbatim.gameContext.getPlayerUUID(player), loadedJoinedChannels);
 
         // Ensure all alwaysOn channels are joined by default, and permission is checked for others
         for (ChannelConfig config : channelConfigsByName.values()) {
@@ -185,47 +187,47 @@ public class ChatChannelManager {
                 
                 // Show mature content warning if this is a mature channel and the player wasn't already joined
                 if (!wasJoined && config.mature) {
-                    player.sendSystemMessage(Component.literal("⚠ WARNING: This channel may contain mature content!").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-                    player.sendSystemMessage(Component.literal("By remaining in this channel, you confirm that you are 18+ and okay with seeing messages posted here.").withStyle(ChatFormatting.YELLOW));
-                    player.sendSystemMessage(Component.literal("If you are not comfortable with this, please leave immediately using: ").withStyle(ChatFormatting.YELLOW)
-                        .append(Component.literal("/channel leave").withStyle(ChatFormatting.WHITE, ChatFormatting.UNDERLINE)));
+                    Verbatim.gameContext.sendMessage(player, text("⚠ WARNING: This channel may contain mature content!").withColor(GameColor.GOLD).withBold(true));
+                    Verbatim.gameContext.sendMessage(player, text("By remaining in this channel, you confirm that you are 18+ and okay with seeing messages posted here.").withColor(GameColor.YELLOW));
+                    Verbatim.gameContext.sendMessage(player, text("If you are not comfortable with this, please leave immediately using: ").withColor(GameColor.YELLOW)
+                        .append(text("/channel leave").withColor(GameColor.WHITE).withUnderlined(true)));
                 }
             } else if (loadedJoinedChannels.contains(config.name)) {
                 // If it was in their saved list and not alwaysOn, check permission now
                 // Only check permission if the channel actually has a permission requirement
                 if (config.permission.isPresent() && !Verbatim.permissionService.hasPermission(player, config.permission.get(), 2)) {
-                    Verbatim.LOGGER.info("[ChatChannelManager] Player {} lost permission for saved joined channel '{}' on login. Removing.", player.getName().getString(), config.name);
+                    Verbatim.LOGGER.info("[ChatChannelManager] Player {} lost permission for saved joined channel '{}' on login. Removing.", Verbatim.gameContext.getPlayerUsername(player), config.name);
                     internalLeaveChannel(player, config.name); // Silently remove, don't message yet
                 }
             }
         }
 
         if (loadedFocusedChannel != null && getJoinedChannels(player).contains(loadedFocusedChannel)) {
-            playerFocus.put(player.getUUID(), ChatFocus.createChannelFocus(loadedFocusedChannel));
+            playerFocus.put(Verbatim.gameContext.getPlayerUUID(player), ChatFocus.createChannelFocus(loadedFocusedChannel));
         } else {
-             playerFocus.remove(player.getUUID()); // Will be set by ensurePlayerIsInADefaultFocus
+             playerFocus.remove(Verbatim.gameContext.getPlayerUUID(player)); // Will be set by ensurePlayerIsInADefaultFocus
         }
         savePlayerChannelState(player);
     }
 
     private static void ensurePlayerIsInADefaultFocus(ServerPlayer player) {
-        FocusTarget currentFocus = playerFocus.get(player.getUUID());
+        FocusTarget currentFocus = playerFocus.get(Verbatim.gameContext.getPlayerUUID(player));
         if (currentFocus == null || !currentFocus.isValid() || 
             (currentFocus instanceof ChatFocus && !isJoined(player, ((ChatFocus) currentFocus).getChannelName()))) {
             ChannelConfig defaultChannel = getDefaultChannelConfig();
             if (defaultChannel != null) {
-                Verbatim.LOGGER.info("[ChatChannelManager] Player {} focus invalid or not joined. Focusing to default '{}'.", player.getName().getString(), defaultChannel.name);
+                Verbatim.LOGGER.info("[ChatChannelManager] Player {} focus invalid or not joined. Focusing to default '{}'.", Verbatim.gameContext.getPlayerUsername(player), defaultChannel.name);
                 focusChannel(player, defaultChannel.name); // This will also join if not already
             } else {
-                Verbatim.LOGGER.error("[ChatChannelManager] Player {} needs focus reset, but no default channel available!", player.getName().getString());
+                Verbatim.LOGGER.error("[ChatChannelManager] Player {} needs focus reset, but no default channel available!", Verbatim.gameContext.getPlayerUsername(player));
             }
         }
     }
 
     private static void savePlayerChannelState(ServerPlayer player) {
-        Set<String> currentJoined = joinedChannels.getOrDefault(player.getUUID(), new HashSet<>());
+        Set<String> currentJoined = joinedChannels.getOrDefault(Verbatim.gameContext.getPlayerUUID(player), new HashSet<>());
         player.getPersistentData().putString("verbatim:joined_channels", String.join(",", currentJoined));
-        FocusTarget currentFocused = playerFocus.get(player.getUUID());
+        FocusTarget currentFocused = playerFocus.get(Verbatim.gameContext.getPlayerUUID(player));
         if (currentFocused instanceof ChatFocus) {
             ChatFocus chatFocus = (ChatFocus) currentFocused;
             if (chatFocus.getType() == ChatFocus.FocusType.CHANNEL) {
@@ -245,7 +247,7 @@ public class ChatChannelManager {
     }
 
     public static Set<String> getJoinedChannels(ServerPlayer player) {
-        return joinedChannels.getOrDefault(player.getUUID(), new HashSet<>());
+        return joinedChannels.getOrDefault(Verbatim.gameContext.getPlayerUUID(player), new HashSet<>());
     }
 
     public static List<ChannelConfig> getJoinedChannelConfigs(ServerPlayer player) {
@@ -257,7 +259,7 @@ public class ChatChannelManager {
     }
 
     public static Optional<ChannelConfig> getFocusedChannelConfig(ServerPlayer player) {
-        FocusTarget focus = playerFocus.get(player.getUUID());
+        FocusTarget focus = playerFocus.get(Verbatim.gameContext.getPlayerUUID(player));
         if (focus instanceof ChatFocus && ((ChatFocus) focus).getType() == ChatFocus.FocusType.CHANNEL) {
             return getChannelConfigByName(((ChatFocus) focus).getChannelName());
         }
@@ -277,7 +279,7 @@ public class ChatChannelManager {
         if (!forceJoin && config.permission.isPresent() && !Verbatim.permissionService.hasPermission(player, config.permission.get(), 2)) {
             return false;
         }
-        joinedChannels.computeIfAbsent(player.getUUID(), k -> new HashSet<>()).add(channelName);
+        joinedChannels.computeIfAbsent(Verbatim.gameContext.getPlayerUUID(player), k -> new HashSet<>()).add(channelName);
         savePlayerChannelState(player);
         return true;
     }
@@ -286,11 +288,11 @@ public class ChatChannelManager {
     public static boolean joinChannel(ServerPlayer player, String channelName) {
         ChannelConfig config = channelConfigsByName.get(channelName);
         if (config == null) {
-            player.sendSystemMessage(Component.literal("Channel '" + channelName + "' not found.").withStyle(ChatFormatting.RED));
+            Verbatim.gameContext.sendMessage(player, text("Channel '" + channelName + "' not found.").withColor(GameColor.RED));
             return false;
         }
         if (isJoined(player, channelName)) {
-             player.sendSystemMessage(Component.literal("Already joined to channel: ").withStyle(ChatFormatting.YELLOW)
+            Verbatim.gameContext.sendMessage(player, text("Already joined to channel: ").withColor(GameColor.YELLOW)
                 .append(ChatFormattingUtils.parseColors(config.displayPrefix + " " + config.name)));
             return true; // Already joined
         }
@@ -298,20 +300,20 @@ public class ChatChannelManager {
         // Only check permission if the channel has one and isn't alwaysOn
         if (config.alwaysOn || !config.permission.isPresent() || Verbatim.permissionService.hasPermission(player, config.permission.get(), 2)) {
             internalJoinChannel(player, channelName, config.alwaysOn);
-            player.sendSystemMessage(Component.literal("Joined channel: ").withStyle(ChatFormatting.GREEN)
+            Verbatim.gameContext.sendMessage(player, text("Joined channel: ").withColor(GameColor.GREEN)
                 .append(ChatFormattingUtils.parseColors(config.displayPrefix + " " + config.name)));
-            
+
             // Show mature content warning if this is a mature channel
             if (config.mature) {
-                player.sendSystemMessage(Component.literal("⚠ WARNING: This channel may contain mature content. ⚠").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-                player.sendSystemMessage(Component.literal("By remaining in this channel, you confirm that you are 18+ and okay with seeing messages posted here.").withStyle(ChatFormatting.YELLOW));
-                player.sendSystemMessage(Component.literal("If you are not comfortable with this, please leave immediately using: ").withStyle(ChatFormatting.YELLOW)
-                    .append(Component.literal("/channel leave").withStyle(ChatFormatting.WHITE, ChatFormatting.UNDERLINE)));
+                Verbatim.gameContext.sendMessage(player, text("⚠ WARNING: This channel may contain mature content. ⚠").withColor(GameColor.GOLD).withBold(true));
+                Verbatim.gameContext.sendMessage(player, text("By remaining in this channel, you confirm that you are 18+ and okay with seeing messages posted here.").withColor(GameColor.YELLOW));
+                Verbatim.gameContext.sendMessage(player, text("If you are not comfortable with this, please leave immediately using: ").withColor(GameColor.YELLOW)
+                    .append(text("/channel leave").withColor(GameColor.WHITE).withUnderlined(true)));
             }
             return true;
         } else {
-            player.sendSystemMessage(Component.literal("You do not have permission to join channel: ")
-                .append(ChatFormattingUtils.parseColors(config.displayPrefix + " " + config.name)).withStyle(ChatFormatting.RED));
+            Verbatim.gameContext.sendMessage(player, text("You do not have permission to join channel: ").withColor(GameColor.RED)
+                .append(ChatFormattingUtils.parseColors(config.displayPrefix + " " + config.name)));
             return false;
         }
     }
@@ -320,28 +322,28 @@ public class ChatChannelManager {
     public static void autoLeaveChannel(ServerPlayer player, String channelName) {
         internalLeaveChannel(player, channelName);
         // If the channel they were auto-left from was their focus, reset focus
-        FocusTarget currentFocus = playerFocus.get(player.getUUID());
+        FocusTarget currentFocus = playerFocus.get(Verbatim.gameContext.getPlayerUUID(player));
         if (currentFocus instanceof ChatFocus && channelName.equals(((ChatFocus) currentFocus).getChannelName())) {
-            playerFocus.remove(player.getUUID());
+            playerFocus.remove(Verbatim.gameContext.getPlayerUUID(player));
             ensurePlayerIsInADefaultFocus(player);
-            player.sendSystemMessage(Component.literal("You were automatically removed from channel '")
-                .append(Component.literal(channelName).withStyle(ChatFormatting.YELLOW))
-                .append(Component.literal("' due to permission loss and it was your focus. Focused to default.")).withStyle(ChatFormatting.RED));
+            Verbatim.gameContext.sendMessage(player, text("You were automatically removed from channel '").withColor(GameColor.RED)
+                .append(text(channelName).withColor(GameColor.YELLOW))
+                .append(text("' due to permission loss and it was your focus. Focused to default.").withColor(GameColor.RED)));
         } else {
-             player.sendSystemMessage(Component.literal("You were automatically removed from channel '")
-                .append(Component.literal(channelName).withStyle(ChatFormatting.YELLOW))
-                .append(Component.literal("' due to permission loss.")).withStyle(ChatFormatting.RED));
+            Verbatim.gameContext.sendMessage(player, text("You were automatically removed from channel '").withColor(GameColor.RED)
+                .append(text(channelName).withColor(GameColor.YELLOW))
+                .append(text("' due to permission loss.").withColor(GameColor.RED)));
         }
         savePlayerChannelState(player);
     }
 
     private static void internalLeaveChannel(ServerPlayer player, String channelName) {
-        joinedChannels.computeIfPresent(player.getUUID(), (k, v) -> { 
+        joinedChannels.computeIfPresent(Verbatim.gameContext.getPlayerUUID(player), (k, v) -> { 
             v.remove(channelName); 
             return v.isEmpty() ? null : v; 
         });
-        if (joinedChannels.get(player.getUUID()) == null) {
-            joinedChannels.remove(player.getUUID());
+        if (joinedChannels.get(Verbatim.gameContext.getPlayerUUID(player)) == null) {
+            joinedChannels.remove(Verbatim.gameContext.getPlayerUUID(player));
         }
         // Do not remove focus here, autoLeaveChannel handles focus reset if needed.
         savePlayerChannelState(player);
@@ -351,29 +353,29 @@ public class ChatChannelManager {
     public static boolean leaveChannelCmd(ServerPlayer player, String channelName) {
         ChannelConfig config = channelConfigsByName.get(channelName);
         if (config == null) {
-            player.sendSystemMessage(Component.literal("Channel '" + channelName + "' not found.").withStyle(ChatFormatting.RED));
+            Verbatim.gameContext.sendMessage(player, text("Channel '" + channelName + "' not found.").withColor(GameColor.RED));
             return false;
         }
         if (config.alwaysOn) {
-            player.sendSystemMessage(Component.literal("Cannot leave channel '")
+            Verbatim.gameContext.sendMessage(player, text("Cannot leave channel '").withColor(GameColor.RED)
                 .append(ChatFormattingUtils.parseColors(config.displayPrefix + " " + config.name))
-                .append(Component.literal("' as it is marked always-on.")).withStyle(ChatFormatting.RED));
+                .append(text("' as it is marked always-on.").withColor(GameColor.RED)));
             return false;
         }
         if (!isJoined(player, channelName)) {
-            player.sendSystemMessage(Component.literal("You are not currently in channel: ").withStyle(ChatFormatting.YELLOW)
+            Verbatim.gameContext.sendMessage(player, text("You are not currently in channel: ").withColor(GameColor.YELLOW)
                 .append(ChatFormattingUtils.parseColors(config.displayPrefix + " " + config.name)));
             return false;
         }
 
         internalLeaveChannel(player, channelName);
-        player.sendSystemMessage(Component.literal("Left channel: ").withStyle(ChatFormatting.YELLOW)
+        Verbatim.gameContext.sendMessage(player, text("Left channel: ").withColor(GameColor.YELLOW)
             .append(ChatFormattingUtils.parseColors(config.displayPrefix + " " + config.name)));
-        
+
         // If they left their focused channel, reset focus to default
-        FocusTarget currentFocus = playerFocus.get(player.getUUID());
+        FocusTarget currentFocus = playerFocus.get(Verbatim.gameContext.getPlayerUUID(player));
         if (currentFocus instanceof ChatFocus && channelName.equals(((ChatFocus) currentFocus).getChannelName())) {
-            playerFocus.remove(player.getUUID());
+            playerFocus.remove(Verbatim.gameContext.getPlayerUUID(player));
             ensurePlayerIsInADefaultFocus(player); // This will also message the player about new focus
         }
         savePlayerChannelState(player);
@@ -383,7 +385,7 @@ public class ChatChannelManager {
     public static void focusChannel(ServerPlayer player, String channelName) {
         ChannelConfig config = channelConfigsByName.get(channelName);
         if (config == null) {
-            player.sendSystemMessage(Component.literal("Cannot focus channel '" + channelName + "': Not found.").withStyle(ChatFormatting.RED));
+            Verbatim.gameContext.sendMessage(player, text("Cannot focus channel '" + channelName + "': Not found.").withColor(GameColor.RED));
             return;
         }
 
@@ -391,60 +393,57 @@ public class ChatChannelManager {
         if (config.alwaysOn || !config.permission.isPresent() || Verbatim.permissionService.hasPermission(player, config.permission.get(), 2)) {
             boolean wasJoined = isJoined(player, channelName);
             internalJoinChannel(player, channelName, config.alwaysOn); // Ensure joined (force if alwaysOn)
-            playerFocus.put(player.getUUID(), ChatFocus.createChannelFocus(channelName));
+            playerFocus.put(Verbatim.gameContext.getPlayerUUID(player), ChatFocus.createChannelFocus(channelName));
             savePlayerChannelState(player);
-            player.sendSystemMessage(Component.literal("Focused channel: ")
-                .append(ChatFormattingUtils.parseColors(config.displayPrefix + " " + config.name)).withStyle(ChatFormatting.GREEN));
-            
+            Verbatim.gameContext.sendMessage(player, text("Focused channel: ").withColor(GameColor.GREEN)
+                .append(ChatFormattingUtils.parseColors(config.displayPrefix + " " + config.name)));
+
             // Show mature content warning if this is a mature channel and the player wasn't already joined
             if (!wasJoined && config.mature) {
-                player.sendSystemMessage(Component.literal("⚠ WARNING: This channel may contain mature content. ⚠").withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD));
-                player.sendSystemMessage(Component.literal("By remaining in this channel, you confirm that you are 18+ and okay with seeing messages posted here.").withStyle(ChatFormatting.YELLOW));
-                player.sendSystemMessage(Component.literal("If you are not comfortable with this, please leave immediately using: ").withStyle(ChatFormatting.YELLOW)
-                    .append(Component.literal("/channel leave").withStyle(ChatFormatting.WHITE, ChatFormatting.UNDERLINE)));
+                Verbatim.gameContext.sendMessage(player, text("⚠ WARNING: This channel may contain mature content. ⚠").withColor(GameColor.GOLD).withBold(true));
+                Verbatim.gameContext.sendMessage(player, text("By remaining in this channel, you confirm that you are 18+ and okay with seeing messages posted here.").withColor(GameColor.YELLOW));
+                Verbatim.gameContext.sendMessage(player, text("If you are not comfortable with this, please leave immediately using: ").withColor(GameColor.YELLOW)
+                    .append(text("/channel leave").withColor(GameColor.WHITE).withUnderlined(true)));
             }
         } else {
-            player.sendSystemMessage(Component.literal("Cannot focus channel '")
+            Verbatim.gameContext.sendMessage(player, text("Cannot focus channel '").withColor(GameColor.RED)
                 .append(ChatFormattingUtils.parseColors(config.displayPrefix + " " + config.name))
-                .append(Component.literal("': You do not have permission.")).withStyle(ChatFormatting.RED));
+                .append(text("': You do not have permission.").withColor(GameColor.RED)));
         }
     }
 
     public static void playerLoggedOut(ServerPlayer player) {
         savePlayerChannelState(player); // Ensure state is saved on logout
-        playerFocus.remove(player.getUUID());
-        joinedChannels.remove(player.getUUID());
-        lastIncomingDmSender.remove(player.getUUID());
+        playerFocus.remove(Verbatim.gameContext.getPlayerUUID(player));
+        joinedChannels.remove(Verbatim.gameContext.getPlayerUUID(player));
+        lastIncomingDmSender.remove(Verbatim.gameContext.getPlayerUUID(player));
     }
 
     // New DM-related methods
     public static void focusDm(ServerPlayer player, UUID targetPlayerId) {
         ServerPlayer targetPlayer = getPlayerByUUID(targetPlayerId);
         if (targetPlayer == null) {
-            player.sendSystemMessage(Component.literal("Cannot focus DM: Target player is not online.").withStyle(ChatFormatting.RED));
+            Verbatim.gameContext.sendMessage(player, text("Cannot focus DM: Target player is not online.").withColor(GameColor.RED));
             return;
         }
-        
-        playerFocus.put(player.getUUID(), ChatFocus.createDmFocus(targetPlayerId));
-        player.sendSystemMessage(Component.literal("Focused DM with: ")
-            .append(Component.literal(targetPlayer.getName().getString()).withStyle(ChatFormatting.YELLOW)));
+
+        playerFocus.put(Verbatim.gameContext.getPlayerUUID(player), ChatFocus.createDmFocus(targetPlayerId));
+        Verbatim.gameContext.sendMessage(player, text("Focused DM with: ")
+            .append(text(Verbatim.gameContext.getPlayerUsername(targetPlayer)).withColor(GameColor.YELLOW)));
     }
-    
+
     public static void focusDm(ServerPlayer player, String targetPlayerName) {
-        net.minecraft.server.MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
-        if (server == null) return;
-        
-        ServerPlayer targetPlayer = server.getPlayerList().getPlayerByName(targetPlayerName);
+        ServerPlayer targetPlayer = Verbatim.gameContext.getPlayerByName(targetPlayerName);
         if (targetPlayer == null) {
-            player.sendSystemMessage(Component.literal("Cannot focus DM: Player '" + targetPlayerName + "' is not online.").withStyle(ChatFormatting.RED));
+            Verbatim.gameContext.sendMessage(player, text("Cannot focus DM: Player '" + targetPlayerName + "' is not online.").withColor(GameColor.RED));
             return;
         }
-        
+
         focusDm(player, targetPlayer.getUUID());
     }
     
     public static Optional<FocusTarget> getFocus(ServerPlayer player) {
-        return Optional.ofNullable(playerFocus.get(player.getUUID()));
+        return Optional.ofNullable(playerFocus.get(Verbatim.gameContext.getPlayerUUID(player)));
     }
     
     public static void setLastIncomingDmSender(ServerPlayer recipient, UUID senderId) {
@@ -452,15 +451,15 @@ public class ChatChannelManager {
     }
     
     public static Optional<UUID> getLastIncomingDmSender(ServerPlayer player) {
-        return Optional.ofNullable(lastIncomingDmSender.get(player.getUUID()));
+        return Optional.ofNullable(lastIncomingDmSender.get(Verbatim.gameContext.getPlayerUUID(player)));
     }
     
     public static void handleDPrefix(ServerPlayer player) {
-        FocusTarget currentFocus = playerFocus.get(player.getUUID());
-        UUID lastSender = lastIncomingDmSender.get(player.getUUID());
-        
+        FocusTarget currentFocus = playerFocus.get(Verbatim.gameContext.getPlayerUUID(player));
+        UUID lastSender = lastIncomingDmSender.get(Verbatim.gameContext.getPlayerUUID(player));
+
         if (lastSender == null) {
-            player.sendSystemMessage(Component.literal("No recent DMs to reply to.").withStyle(ChatFormatting.YELLOW));
+            Verbatim.gameContext.sendMessage(player, text("No recent DMs to reply to.").withColor(GameColor.YELLOW));
             return;
         }
         
@@ -479,15 +478,15 @@ public class ChatChannelManager {
 
     public static List<ServerPlayer> getPlayersInChannel(MinecraftServer server, String channelName) {
         List<ServerPlayer> playersInChannel = new ArrayList<>();
-        if (server == null || channelName == null || channelName.isEmpty()) {
-            return playersInChannel; // Return empty list if server or channelName is invalid
+        if (channelName == null || channelName.isEmpty()) {
+            return playersInChannel; // Return empty list if channelName is invalid
         }
         // Check if the channel itself exists, otherwise no point iterating players
         if (!channelConfigsByName.containsKey(channelName)) {
-            return playersInChannel; 
+            return playersInChannel;
         }
 
-        for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+        for (ServerPlayer player : Verbatim.gameContext.getAllOnlinePlayers()) {
             if (isJoined(player, channelName)) {
                 playersInChannel.add(player);
             }
@@ -500,7 +499,7 @@ public class ChatChannelManager {
 
         if (!channelConfigOpt.isPresent()) {
             if (executor != null) {
-                executor.sendSystemMessage(Component.literal("Channel '" + channelName + "' not found.").withStyle(ChatFormatting.RED));
+                Verbatim.gameContext.sendMessage(executor, text("Channel '" + channelName + "' not found.").withColor(GameColor.RED));
             }
             return false;
         }
@@ -509,14 +508,14 @@ public class ChatChannelManager {
 
         if (channelConfig.alwaysOn) {
             if (executor != null) {
-                executor.sendSystemMessage(Component.literal("Cannot kick players from '" + channelName + "' as it is an always-on channel.").withStyle(ChatFormatting.RED));
+                Verbatim.gameContext.sendMessage(executor, text("Cannot kick players from '" + channelName + "' as it is an always-on channel.").withColor(GameColor.RED));
             }
             return false;
         }
 
         if (!isJoined(playerToKick, channelName)) {
             if (executor != null) {
-                executor.sendSystemMessage(Component.literal(playerToKick.getName().getString() + " is not in channel '" + channelName + "'.").withStyle(ChatFormatting.RED));
+                Verbatim.gameContext.sendMessage(executor, text(Verbatim.gameContext.getPlayerUsername(playerToKick) + " is not in channel '" + channelName + "'.").withColor(GameColor.RED));
             }
             return false;
         }
@@ -525,24 +524,23 @@ public class ChatChannelManager {
         internalLeaveChannel(playerToKick, channelName); // This handles removing from joinedChannels and saving state
 
         // Notify the kicked player
-        playerToKick.sendSystemMessage(Component.literal("You have been kicked from channel '" + channelName + "' by " + (executor != null ? executor.getName().getString() : "an administrator") + ".").withStyle(ChatFormatting.YELLOW));
+        Verbatim.gameContext.sendMessage(playerToKick, text("You have been kicked from channel '" + channelName + "' by " + (executor != null ? Verbatim.gameContext.getPlayerUsername(executor) : "an administrator") + ".").withColor(GameColor.YELLOW));
 
         // Check if the kicked channel was the player's focus and reset if necessary
-        FocusTarget currentFocus = playerFocus.get(playerToKick.getUUID());
+        FocusTarget currentFocus = playerFocus.get(Verbatim.gameContext.getPlayerUUID(playerToKick));
         if (currentFocus instanceof ChatFocus && channelName.equals(((ChatFocus) currentFocus).getChannelName())) {
-            playerFocus.remove(playerToKick.getUUID());
+            playerFocus.remove(Verbatim.gameContext.getPlayerUUID(playerToKick));
             ensurePlayerIsInADefaultFocus(playerToKick); // This will also save player state
-            playerToKick.sendSystemMessage(Component.literal("Your focus was reset as you were kicked from your focused channel.").withStyle(ChatFormatting.YELLOW));
+            Verbatim.gameContext.sendMessage(playerToKick, text("Your focus was reset as you were kicked from your focused channel.").withColor(GameColor.YELLOW));
         } else {
-             savePlayerChannelState(playerToKick); // Ensure state is saved even if focus didn't change
+            savePlayerChannelState(playerToKick); // Ensure state is saved even if focus didn't change
         }
-        
-        Verbatim.LOGGER.info("Player {} was kicked from channel {} by {}.", playerToKick.getName().getString(), channelName, (executor != null ? executor.getName().getString() : "CONSOLE"));
+
+        Verbatim.LOGGER.info("Player {} was kicked from channel {} by {}.", Verbatim.gameContext.getPlayerUsername(playerToKick), channelName, (executor != null ? Verbatim.gameContext.getPlayerUsername(executor) : "CONSOLE"));
         return true;
     }
 
     public static ServerPlayer getPlayerByUUID(UUID playerId) {
-        MinecraftServer server = net.neoforged.neoforge.server.ServerLifecycleHooks.getCurrentServer();
-        return server != null ? server.getPlayerList().getPlayer(playerId) : null;
+        return Verbatim.gameContext.getPlayerByUUID(playerId);
     }
 }

@@ -67,7 +67,7 @@ public class PrefixService {
         }
 
         try {
-            User user = this.luckPermsApi.getUserManager().getUser(player.getUUID());
+            User user = this.luckPermsApi.getUserManager().getUser(Verbatim.gameContext.getPlayerUUID(player));
             if (user != null) {
                 CachedMetaData metaData = user.getCachedData().getMetaData();
                 String prefix = metaData.getPrefix();
@@ -75,7 +75,7 @@ public class PrefixService {
             } else {
                 // Try to load the user synchronously
                 try {
-                    User loadedUser = this.luckPermsApi.getUserManager().loadUser(player.getUUID()).get();
+                    User loadedUser = this.luckPermsApi.getUserManager().loadUser(Verbatim.gameContext.getPlayerUUID(player)).get();
                     if (loadedUser != null) {
                         CachedMetaData metaData = loadedUser.getCachedData().getMetaData();
                         String prefix = metaData.getPrefix();
@@ -83,12 +83,12 @@ public class PrefixService {
                     }
                 } catch (Exception e) {
                     Verbatim.LOGGER.debug("[Verbatim PrefixService] Failed to load user '{}' for prefix: {}", 
-                                        player.getName().getString(), e.getMessage());
+                                        Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
                 }
             }
         } catch (Exception e) {
             Verbatim.LOGGER.debug("[Verbatim PrefixService] Error getting prefix for player '{}': {}", 
-                                player.getName().getString(), e.getMessage());
+                                Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
         }
 
         return "";
@@ -114,26 +114,26 @@ public class PrefixService {
         }
 
         try {
-            User user = this.luckPermsApi.getUserManager().getUser(player.getUUID());
+            User user = this.luckPermsApi.getUserManager().getUser(Verbatim.gameContext.getPlayerUUID(player));
             if (user != null) {
                 String primaryGroup = user.getPrimaryGroup();
                 return primaryGroup != null ? primaryGroup : "";
             } else {
                 // Try to load the user synchronously
                 try {
-                    User loadedUser = this.luckPermsApi.getUserManager().loadUser(player.getUUID()).get();
+                    User loadedUser = this.luckPermsApi.getUserManager().loadUser(Verbatim.gameContext.getPlayerUUID(player)).get();
                     if (loadedUser != null) {
                         String primaryGroup = loadedUser.getPrimaryGroup();
                         return primaryGroup != null ? primaryGroup : "";
                     }
                 } catch (Exception e) {
                     Verbatim.LOGGER.debug("[Verbatim PrefixService] Failed to load user '{}' for primary group: {}", 
-                                        player.getName().getString(), e.getMessage());
+                                        Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
                 }
             }
         } catch (Exception e) {
             Verbatim.LOGGER.debug("[Verbatim PrefixService] Error getting primary group for player '{}': {}", 
-                                player.getName().getString(), e.getMessage());
+                                Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
         }
 
         return "";
@@ -159,7 +159,7 @@ public class PrefixService {
         }
 
         try {
-            User user = this.luckPermsApi.getUserManager().getUser(player.getUUID());
+            User user = this.luckPermsApi.getUserManager().getUser(Verbatim.gameContext.getPlayerUUID(player));
             if (user != null) {
                 user.getNodes().stream()
                     .filter(node -> node.getType().name().equals("INHERITANCE"))
@@ -172,7 +172,7 @@ public class PrefixService {
             } else {
                 // Try to load the user synchronously
                 try {
-                    User loadedUser = this.luckPermsApi.getUserManager().loadUser(player.getUUID()).get();
+                    User loadedUser = this.luckPermsApi.getUserManager().loadUser(Verbatim.gameContext.getPlayerUUID(player)).get();
                     if (loadedUser != null) {
                         loadedUser.getNodes().stream()
                             .filter(node -> node.getType().name().equals("INHERITANCE"))
@@ -185,12 +185,12 @@ public class PrefixService {
                     }
                 } catch (Exception e) {
                     Verbatim.LOGGER.debug("[Verbatim PrefixService] Failed to load user '{}' for groups: {}", 
-                                        player.getName().getString(), e.getMessage());
+                                        Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
                 }
             }
         } catch (Exception e) {
             Verbatim.LOGGER.debug("[Verbatim PrefixService] Error getting groups for player '{}': {}", 
-                                player.getName().getString(), e.getMessage());
+                                Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
         }
 
         return groups;
@@ -247,7 +247,7 @@ public class PrefixService {
         }
 
         try {
-            User user = this.luckPermsApi.getUserManager().getUser(player.getUUID());
+            User user = this.luckPermsApi.getUserManager().getUser(Verbatim.gameContext.getPlayerUUID(player));
             if (user != null) {
                 CachedMetaData metaData = user.getCachedData().getMetaData();
                 
@@ -262,7 +262,7 @@ public class PrefixService {
             } else {
                 // Try to load the user synchronously
                 try {
-                    User loadedUser = this.luckPermsApi.getUserManager().loadUser(player.getUUID()).get();
+                    User loadedUser = this.luckPermsApi.getUserManager().loadUser(Verbatim.gameContext.getPlayerUUID(player)).get();
                     if (loadedUser != null) {
                         CachedMetaData metaData = loadedUser.getCachedData().getMetaData();
                         
@@ -277,12 +277,12 @@ public class PrefixService {
                     }
                 } catch (Exception e) {
                     Verbatim.LOGGER.debug("[Verbatim PrefixService] Failed to load user '{}' for prefix tooltip: {}", 
-                                        player.getName().getString(), e.getMessage());
+                                        Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
                 }
             }
         } catch (Exception e) {
             Verbatim.LOGGER.debug("[Verbatim PrefixService] Error getting prefix tooltip for player '{}': {}", 
-                                player.getName().getString(), e.getMessage());
+                                Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
         }
 
         return null;

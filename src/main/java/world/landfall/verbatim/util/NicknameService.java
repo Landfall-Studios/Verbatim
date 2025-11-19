@@ -1,6 +1,5 @@
 package world.landfall.verbatim.util;
 
-import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerPlayer;
 import world.landfall.verbatim.ChatFormattingUtils;
 import world.landfall.verbatim.Verbatim;
@@ -46,13 +45,12 @@ public class NicknameService {
         }
 
         // Store in player's persistent data
-        CompoundTag persistentData = player.getPersistentData();
-        persistentData.putString(NBT_NICKNAME_KEY, processedNickname);
+        Verbatim.gameContext.setPlayerStringData(player, NBT_NICKNAME_KEY, processedNickname);
 
         // Update cache
-        nicknameCache.put(player.getUUID(), processedNickname);
+        nicknameCache.put(Verbatim.gameContext.getPlayerUUID(player), processedNickname);
 
-        Verbatim.LOGGER.debug("Set nickname for player {} to: {}", player.getName().getString(), processedNickname);
+        Verbatim.LOGGER.debug("Set nickname for player {} to: {}", Verbatim.gameContext.getPlayerUsername(player), processedNickname);
         return processedNickname;
     }
 
@@ -63,7 +61,7 @@ public class NicknameService {
      * @return The player's nickname, or null if not set
      */
     public static String getNickname(ServerPlayer player) {
-        UUID playerId = player.getUUID();
+        UUID playerId = Verbatim.gameContext.getPlayerUUID(player);
 
         // Check cache first
         if (nicknameCache.containsKey(playerId)) {
@@ -71,9 +69,8 @@ public class NicknameService {
         }
 
         // Load from persistent data
-        CompoundTag persistentData = player.getPersistentData();
-        if (persistentData.contains(NBT_NICKNAME_KEY)) {
-            String nickname = persistentData.getString(NBT_NICKNAME_KEY);
+        if (Verbatim.gameContext.hasPlayerData(player, NBT_NICKNAME_KEY)) {
+            String nickname = Verbatim.gameContext.getPlayerStringData(player, NBT_NICKNAME_KEY);
             nicknameCache.put(playerId, nickname);
             return nickname;
         }
@@ -87,16 +84,15 @@ public class NicknameService {
      * @param player The player to clear the nickname for
      */
     public static void clearNickname(ServerPlayer player) {
-        UUID playerId = player.getUUID();
+        UUID playerId = Verbatim.gameContext.getPlayerUUID(player);
 
         // Remove from persistent data
-        CompoundTag persistentData = player.getPersistentData();
-        persistentData.remove(NBT_NICKNAME_KEY);
+        Verbatim.gameContext.removePlayerData(player, NBT_NICKNAME_KEY);
 
         // Remove from cache
         nicknameCache.remove(playerId);
 
-        Verbatim.LOGGER.debug("Cleared nickname for player {}", player.getName().getString());
+        Verbatim.LOGGER.debug("Cleared nickname for player {}", Verbatim.gameContext.getPlayerUsername(player));
     }
 
     /**
@@ -128,7 +124,7 @@ public class NicknameService {
     public static String getNameForStyle(ServerPlayer player, world.landfall.verbatim.NameStyle nameStyle) {
         switch (nameStyle) {
             case USERNAME:
-                return player.getName().getString();
+                return Verbatim.gameContext.getPlayerUsername(player);
 
             case NICKNAME:
                 String nickname = getNickname(player);
@@ -136,11 +132,11 @@ public class NicknameService {
                     return nickname;
                 }
                 // Fall back to username if no nickname is set
-                return player.getName().getString();
+                return Verbatim.gameContext.getPlayerUsername(player);
 
             case DISPLAY_NAME:
             default:
-                return ChatFormattingUtils.stripFormattingCodes(player.getDisplayName().getString());
+                return ChatFormattingUtils.stripFormattingCodes(Verbatim.gameContext.getPlayerDisplayName(player));
         }
     }
 
@@ -155,7 +151,7 @@ public class NicknameService {
     public static String getRawNameForStyle(ServerPlayer player, world.landfall.verbatim.NameStyle nameStyle) {
         switch (nameStyle) {
             case USERNAME:
-                return player.getName().getString();
+                return Verbatim.gameContext.getPlayerUsername(player);
 
             case NICKNAME:
                 String nickname = getNickname(player);
@@ -163,11 +159,11 @@ public class NicknameService {
                     return nickname;
                 }
                 // Fall back to username if no nickname is set
-                return player.getName().getString();
+                return Verbatim.gameContext.getPlayerUsername(player);
 
             case DISPLAY_NAME:
             default:
-                return player.getDisplayName().getString();
+                return Verbatim.gameContext.getPlayerDisplayName(player);
         }
     }
 }

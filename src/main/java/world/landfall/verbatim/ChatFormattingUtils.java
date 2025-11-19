@@ -7,6 +7,11 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.server.level.ServerPlayer;
+import world.landfall.verbatim.context.GameComponent;
+import world.landfall.verbatim.context.GameComponentImpl;
+
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class ChatFormattingUtils {
 
@@ -14,9 +19,74 @@ public class ChatFormattingUtils {
     public static final String PERM_CHAT_COLOR = "verbatim.chatcolor";
     public static final String PERM_CHAT_FORMAT = "verbatim.chatformat";
 
-    public static Component parseColors(String text) {
+    // URL detection pattern - matches http://, https://, and www. URLs
+    private static final Pattern URL_PATTERN = Pattern.compile(
+        "(https?://[\\w\\-._~:/?#\\[\\]@!$&'()*+,;=%]+|www\\.[\\w\\-._~:/?#\\[\\]@!$&'()*+,;=%]+)",
+        Pattern.CASE_INSENSITIVE
+    );
+
+    /**
+     * Creates a component from text with URLs made clickable.
+     *
+     * @param text The text to process for URLs
+     * @param baseStyle The base style to apply to non-URL text
+     * @return A component with clickable URLs
+     */
+    public static MutableComponent makeLinksClickable(String text, Style baseStyle) {
         if (text == null || text.isEmpty()) {
-            return Component.empty(); // Prefer Component.empty() over Component.literal("")
+            return Component.empty();
+        }
+
+        MutableComponent result = Component.empty();
+        Matcher matcher = URL_PATTERN.matcher(text);
+        int lastEnd = 0;
+
+        while (matcher.find()) {
+            // Add text before the URL
+            if (matcher.start() > lastEnd) {
+                String beforeUrl = text.substring(lastEnd, matcher.start());
+                result.append(Component.literal(beforeUrl).setStyle(baseStyle));
+            }
+
+            // Add the clickable URL
+            String url = matcher.group();
+            String clickUrl = url;
+
+            // Ensure the URL has a protocol for the click event
+            if (url.toLowerCase().startsWith("www.")) {
+                clickUrl = "https://" + url;
+            }
+
+            MutableComponent urlComponent = Component.literal(url);
+            urlComponent.setStyle(baseStyle
+                .withColor(ChatFormatting.BLUE)
+                .withUnderlined(true)
+                .withClickEvent(new ClickEvent(ClickEvent.Action.OPEN_URL, clickUrl))
+                .withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                    Component.literal("Click to open: " + clickUrl).withStyle(ChatFormatting.GRAY)))
+            );
+            result.append(urlComponent);
+
+            lastEnd = matcher.end();
+        }
+
+        // Add any remaining text after the last URL
+        if (lastEnd < text.length()) {
+            String remaining = text.substring(lastEnd);
+            result.append(Component.literal(remaining).setStyle(baseStyle));
+        }
+
+        // If no URLs were found, just return the original text with base style
+        if (lastEnd == 0) {
+            return Component.literal(text).setStyle(baseStyle);
+        }
+
+        return result;
+    }
+
+    public static GameComponent parseColors(String text) {
+        if (text == null || text.isEmpty()) {
+            return GameComponentImpl.empty();
         }
 
         MutableComponent mainComponent = Component.literal("");
@@ -43,16 +113,16 @@ public class ChatFormattingUtils {
                         currentStyle = applyStyle(currentStyle, formatting);
                     }
                 }
-                
+
                 if (!textContent.isEmpty()) {
-                    mainComponent.append(Component.literal(textContent).setStyle(currentStyle));
+                    mainComponent.append(makeLinksClickable(textContent, currentStyle));
                 }
             } else {
                 // No color code at the beginning of this part, append with current style
-                mainComponent.append(Component.literal(part).setStyle(currentStyle));
+                mainComponent.append(makeLinksClickable(part, currentStyle));
             }
         }
-        return mainComponent;
+        return GameComponentImpl.wrap(mainComponent);
     }
 
     // Helper to apply specific formatting to a style
@@ -76,9 +146,9 @@ public class ChatFormattingUtils {
      * @param nameStyle The style of name to display (null for legacy behavior - use displayName for channels, username for DMs)
      * @return A component with the appropriate name and hover text
      */
-    public static Component createPlayerNameComponent(ServerPlayer player, String colorPrefix, boolean isDM, world.landfall.verbatim.NameStyle nameStyle) {
-        String username = player.getName().getString();
-        String displayName = player.getDisplayName().getString(); // Get raw display name
+    public static GameComponent createPlayerNameComponent(ServerPlayer player, String colorPrefix, boolean isDM, world.landfall.verbatim.NameStyle nameStyle) {
+        String username = Verbatim.gameContext.getPlayerUsername(player);
+        String displayName = Verbatim.gameContext.getPlayerDisplayName(player); // Get raw display name
         String strippedDisplayName = stripFormattingCodes(displayName); // Strip codes for comparison and potential use
 
         ClickEvent clickEvent = new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/msg " + username + " ");
@@ -119,10 +189,10 @@ public class ChatFormattingUtils {
         // Get LuckPerms prefix if available
         String luckPermsPrefix = "";
         final String prefixTooltipText;
-        
+
         if (Verbatim.prefixService != null && Verbatim.prefixService.isLuckPermsAvailable()) {
             luckPermsPrefix = Verbatim.prefixService.getPlayerPrefix(player);
-            
+
             // Only get prefix tooltip if there's a prefix
             if (!luckPermsPrefix.isEmpty()) {
                 prefixTooltipText = Verbatim.prefixService.getPrefixTooltip(player);
@@ -135,30 +205,30 @@ public class ChatFormattingUtils {
 
         // Build the full name component
         MutableComponent fullNameComponent = Component.empty();
-        
+
         // Add LuckPerms prefix if present with its own hover tooltip
         if (!luckPermsPrefix.isEmpty()) {
-            MutableComponent prefixComponent = (MutableComponent) parseColors(luckPermsPrefix);
-            
+            MutableComponent prefixComponent = parseColors(luckPermsPrefix).toMinecraftMutable();
+
             // Apply prefix tooltip only to the prefix if it exists
             if (prefixTooltipText != null && !prefixTooltipText.isEmpty()) {
-                Component tooltipComponent = parseColors(prefixTooltipText);
-                prefixComponent = prefixComponent.withStyle(style -> 
+                Component tooltipComponent = parseColors(prefixTooltipText).toMinecraft();
+                prefixComponent = prefixComponent.withStyle(style ->
                     style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, tooltipComponent))
                 );
             }
-            
+
             fullNameComponent.append(prefixComponent);
-            
+
             // Add a space after prefix if it doesn't end with one
             if (!luckPermsPrefix.endsWith(" ")) {
                 fullNameComponent.append(Component.literal(" "));
             }
         }
-        
+
         // Parse the name with its color prefix
-        MutableComponent nameComponent = (MutableComponent) parseColors(colorPrefix + nameToShow);
-        
+        MutableComponent nameComponent = parseColors(colorPrefix + nameToShow).toMinecraftMutable();
+
         // Apply ClickEvent and original HoverEvent (if any) only to the name component
         final HoverEvent finalHoverEvent = hoverEvent; // effectively final for lambda
         nameComponent = nameComponent.withStyle(style -> {
@@ -168,10 +238,10 @@ public class ChatFormattingUtils {
             }
             return updatedStyle;
         });
-        
+
         fullNameComponent.append(nameComponent);
 
-        return fullNameComponent;
+        return GameComponentImpl.wrap(fullNameComponent);
     }
 
     /**
@@ -183,29 +253,65 @@ public class ChatFormattingUtils {
      * @param isDM Whether this is for a direct message (if true, always uses username)
      * @return A component with the appropriate name and hover text
      */
-    public static Component createPlayerNameComponent(ServerPlayer player, String colorPrefix, boolean isDM) {
+    public static GameComponent createPlayerNameComponent(ServerPlayer player, String colorPrefix, boolean isDM) {
         return createPlayerNameComponent(player, colorPrefix, isDM, null);
     }
 
     /**
-     * Creates a Discord-formatted player name string that shows "username (displayname)" when they differ,
-     * or just "username" when they're the same.
-     * 
+     * Creates a Discord-formatted player name string based on the specified name style.
+     *
+     * @param player The player whose name to format for Discord
+     * @param nameStyle The style of name display to use
+     * @return A string formatted for Discord messages
+     */
+    public static String createDiscordPlayerName(ServerPlayer player, NameStyle nameStyle) {
+        String username = Verbatim.gameContext.getPlayerUsername(player);
+
+        if (nameStyle == null) {
+            // Default to username only for backwards compatibility
+            return username;
+        }
+
+        switch (nameStyle) {
+            case USERNAME:
+                // Just the username, no parentheses
+                return username;
+
+            case DISPLAY_NAME:
+                String displayName = Verbatim.gameContext.getPlayerDisplayName(player);
+                // Strip Minecraft formatting codes (§ codes) from display name for Discord
+                String cleanDisplayName = displayName.replaceAll("§[0-9a-fk-or]", "");
+
+                if (!username.equals(cleanDisplayName)) {
+                    return cleanDisplayName + " (" + username + ")";
+                } else {
+                    return username;
+                }
+
+            case NICKNAME:
+                String nickname = world.landfall.verbatim.util.NicknameService.getNickname(player);
+                if (nickname != null && !nickname.trim().isEmpty()) {
+                    // Strip formatting codes from nickname
+                    String cleanNickname = stripFormattingCodes(nickname);
+                    return cleanNickname + " (" + username + ")";
+                } else {
+                    // No nickname set, just return username
+                    return username;
+                }
+
+            default:
+                return username;
+        }
+    }
+
+    /**
+     * Creates a Discord-formatted player name string with default style (username only).
+     *
      * @param player The player whose name to format for Discord
      * @return A string formatted for Discord messages
      */
     public static String createDiscordPlayerName(ServerPlayer player) {
-        String username = player.getName().getString();
-        String displayName = player.getDisplayName().getString();
-        
-        // Strip Minecraft formatting codes (§ codes) from display name for Discord
-        String cleanDisplayName = displayName.replaceAll("§[0-9a-fk-or]", "");
-        
-        if (!username.equals(cleanDisplayName)) {
-            return username + " (" + cleanDisplayName + ")";
-        } else {
-            return username;
-        }
+        return createDiscordPlayerName(player, NameStyle.USERNAME);
     }
 
     /**
@@ -231,9 +337,9 @@ public class ChatFormattingUtils {
      * prefer {@link #parsePlayerInputWithPermissions(String, String, ServerPlayer)} which keeps
      * the channel base color intact.
      */
-    public static Component parseColorsWithPermissions(String text, ServerPlayer player) {
+    public static GameComponent parseColorsWithPermissions(String text, ServerPlayer player) {
         if (text == null || text.isEmpty()) {
-            return Component.empty();
+            return GameComponentImpl.empty();
         }
 
         boolean hasColorPerm  = Verbatim.permissionService.hasPermission(player, PERM_CHAT_COLOR, 2);
@@ -273,13 +379,13 @@ public class ChatFormattingUtils {
                 }
 
                 if (!content.isEmpty()) {
-                    main.append(Component.literal(content).setStyle(current));
+                    main.append(makeLinksClickable(content, current));
                 }
             } else {
-                main.append(Component.literal(part).setStyle(current));
+                main.append(makeLinksClickable(part, current));
             }
         }
-        return main;
+        return GameComponentImpl.wrap(main);
     }
 
     /**
@@ -291,15 +397,15 @@ public class ChatFormattingUtils {
      * @param player           The player whose permissions should be checked.
      * @return Component with safe styles applied.
      */
-    public static Component parsePlayerInputWithPermissions(String channelBaseColor,
+    public static GameComponent parsePlayerInputWithPermissions(String channelBaseColor,
                                                             String playerInput,
                                                             ServerPlayer player) {
         if (playerInput == null || playerInput.isEmpty()) {
-            return Component.empty();
+            return GameComponentImpl.empty();
         }
 
         // First apply the base channel color (always allowed)
-        Component baseColorComponent = parseColors(channelBaseColor);
+        Component baseColorComponent = parseColors(channelBaseColor).toMinecraft();
         Style baseStyle = baseColorComponent.getStyle();
         MutableComponent result = Component.empty();
 
@@ -339,13 +445,13 @@ public class ChatFormattingUtils {
                 }
 
                 if (!content.isEmpty()) {
-                    result.append(Component.literal(content).setStyle(current));
+                    result.append(makeLinksClickable(content, current));
                 }
             } else {
-                result.append(Component.literal(part).setStyle(current));
+                result.append(makeLinksClickable(part, current));
             }
         }
 
-        return result;
+        return GameComponentImpl.wrap(result);
     }
 } 

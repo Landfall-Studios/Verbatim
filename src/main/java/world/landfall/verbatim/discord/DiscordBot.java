@@ -7,12 +7,11 @@ import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.MemberCachePolicy;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
-import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import world.landfall.verbatim.Verbatim;
 import world.landfall.verbatim.VerbatimConfig;
 import world.landfall.verbatim.ChatFormattingUtils;
+import world.landfall.verbatim.NameStyle;
 
 import java.awt.Color;
 import java.util.HashMap;
@@ -35,11 +34,14 @@ public class DiscordBot {
     private static String discordChannelId;
     private static boolean enabled;
     private static boolean useEmbedMode;
+    private static NameStyle discordNameStyle;
     private static ScheduledExecutorService presenceScheduler;
 
     public static void init() {
         enabled = VerbatimConfig.DISCORD_BOT_ENABLED.get();
         useEmbedMode = VerbatimConfig.DISCORD_USE_EMBED_MODE.get();
+        String nameStyleConfig = VerbatimConfig.DISCORD_NAME_STYLE.get();
+        discordNameStyle = NameStyle.fromConfigValue(nameStyleConfig);
         if (!enabled) {
             Verbatim.LOGGER.info("[Verbatim Discord] Bot is disabled in config.");
             return;
@@ -147,7 +149,7 @@ public class DiscordBot {
     }
 
     private static String getPlayerAvatarUrl(ServerPlayer player) {
-        String username = player.getName().getString();
+        String username = Verbatim.gameContext.getPlayerUsername(player);
 
         // Use Minotar with username for better reliability
         return "https://minotar.net/avatar/" + username;
@@ -165,32 +167,26 @@ public class DiscordBot {
                 return;
             }
 
-            String username = player.getName().getString();
-            String strippedDisplayName = ChatFormattingUtils.stripFormattingCodes(player.getDisplayName().getString());
             String cleanMessageContent = ChatFormattingUtils.stripFormattingCodes(messageContent);
+            String authorName = ChatFormattingUtils.createDiscordPlayerName(player, discordNameStyle);
 
             if (useEmbedMode) {
                 String avatarUrl = getPlayerAvatarUrl(player);
 
-                String authorName = username;
-                if (!username.equals(strippedDisplayName)) {
-                    authorName = strippedDisplayName + " (" + username + ")";
-                }
-
                 EmbedBuilder embed = new EmbedBuilder();
                 embed.setAuthor(authorName, null, avatarUrl);
                 embed.setDescription(cleanMessageContent);
-                embed.setColor(generateColorFromUUID(player.getUUID()));
+                embed.setColor(generateColorFromUUID(Verbatim.gameContext.getPlayerUUID(player)));
 
                 channel.sendMessageEmbeds(embed.build()).queue();
                 Verbatim.LOGGER.debug("[Game -> Discord Embed] Relayed for {}: {}", authorName, cleanMessageContent);
             } else {
-                String plainTextMessage = username + ": " + cleanMessageContent;
+                String plainTextMessage = authorName + ": " + cleanMessageContent;
                 channel.sendMessage(plainTextMessage).queue();
-                Verbatim.LOGGER.debug("[Game -> Discord Plain] Relayed for {}: {}", username, cleanMessageContent);
+                Verbatim.LOGGER.debug("[Game -> Discord Plain] Relayed for {}: {}", authorName, cleanMessageContent);
             }
         } catch (Exception e) {
-            Verbatim.LOGGER.error("[Verbatim Discord] Could not send player chat message to Discord for {}.", player.getName().getString(), e);
+            Verbatim.LOGGER.error("[Verbatim Discord] Could not send player chat message to Discord for {}.", Verbatim.gameContext.getPlayerUsername(player), e);
         }
     }
 
@@ -206,12 +202,7 @@ public class DiscordBot {
                 return;
             }
             
-            String username = player.getName().getString();
-            String strippedDisplayName = ChatFormattingUtils.stripFormattingCodes(player.getDisplayName().getString());
-            String effectiveName = username;
-            if (!username.equals(strippedDisplayName)) {
-                effectiveName = strippedDisplayName + " (" + username + ")";
-            }
+            String effectiveName = ChatFormattingUtils.createDiscordPlayerName(player, discordNameStyle);
 
             if (useEmbedMode) {
                 String avatarUrl = getPlayerAvatarUrl(player);
@@ -224,15 +215,15 @@ public class DiscordBot {
                 Verbatim.LOGGER.debug("[Game -> Discord Embed] Connection Status: {} {}", effectiveName, (joined ? "joined" : "left"));
             } else {
                 String statusEmoji = joined ? "➕" : "➖";
-                String plainTextMessage = statusEmoji + " " + username + " has " + (joined ? "joined" : "left") + " the server.";
+                String plainTextMessage = statusEmoji + " " + effectiveName + " has " + (joined ? "joined" : "left") + " the server.";
                 channel.sendMessage(plainTextMessage).queue();
-                Verbatim.LOGGER.debug("[Game -> Discord Plain] Connection Status: {} {}", username, (joined ? "joined" : "left"));
+                Verbatim.LOGGER.debug("[Game -> Discord Plain] Connection Status: {} {}", effectiveName, (joined ? "joined" : "left"));
             }
             // Update presence immediately after join/leave event
             updatePlayerCountStatus();
 
         } catch (Exception e) {
-            Verbatim.LOGGER.error("[Verbatim Discord] Could not send player connection status to Discord for {}.", player.getName().getString(), e);
+            Verbatim.LOGGER.error("[Verbatim Discord] Could not send player connection status to Discord for {}.", Verbatim.gameContext.getPlayerUsername(player), e);
         }
     }
 
@@ -253,10 +244,9 @@ public class DiscordBot {
             return; // JDA not ready
         }
 
-        MinecraftServer server = ServerLifecycleHooks.getCurrentServer();
         String statusMessage;
-        if (server != null) {
-            int playerCount = server.getPlayerList().getPlayerCount();
+        if (Verbatim.gameContext.getServer() != null) {
+            int playerCount = Verbatim.gameContext.getOnlinePlayerCount();
             if (playerCount == 1) {
                 statusMessage = "1 player online";
             } else {
@@ -265,7 +255,7 @@ public class DiscordBot {
         } else {
             statusMessage = "Server Offline";
         }
-        
+
         try {
             jdaInstance.getPresence().setActivity(Activity.watching(statusMessage));
         } catch (Exception e) {

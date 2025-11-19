@@ -8,18 +8,15 @@ import net.minecraft.commands.Commands;
 import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.commands.arguments.EntityArgument;
 import net.minecraft.commands.arguments.MessageArgument;
-import net.minecraft.network.chat.Component;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.network.chat.Style;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.players.PlayerList;
 import world.landfall.verbatim.ChatChannelManager;
 import world.landfall.verbatim.ChatFormattingUtils;
 import world.landfall.verbatim.Verbatim;
 import world.landfall.verbatim.util.NicknameService;
-import net.minecraft.network.chat.MutableComponent;
+import world.landfall.verbatim.context.GameColor;
+import world.landfall.verbatim.context.GameComponent;
+import static world.landfall.verbatim.context.GameText.*;
 
 import java.util.Collection;
 import java.util.List;
@@ -51,7 +48,7 @@ public class VerbatimCommands {
                         ChatChannelManager.getAllChannelConfigs().stream().map(c -> c.name).collect(Collectors.toList()), builder))
                     .executes(context -> {
                         if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
-                            context.getSource().sendFailure(Component.literal("Players only.")); return 0;
+                            Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only.")); return 0;
                         }
                         ChatChannelManager.focusChannel(player, StringArgumentType.getString(context, "channelName"));
                         return 1;
@@ -62,7 +59,7 @@ public class VerbatimCommands {
                         ChatChannelManager.getAllChannelConfigs().stream().map(c -> c.name).collect(Collectors.toList()), builder))
                     .executes(context -> {
                         if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
-                            context.getSource().sendFailure(Component.literal("Players only.")); return 0;
+                            Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only.")); return 0;
                         }
                         ChatChannelManager.joinChannel(player, StringArgumentType.getString(context, "channelName"));
                         return 1;
@@ -76,18 +73,18 @@ public class VerbatimCommands {
                     })
                     .executes(context -> {
                         if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
-                            context.getSource().sendFailure(Component.literal("Players only.")); return 0;
+                            Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only.")); return 0;
                         }
                         ChatChannelManager.leaveChannelCmd(player, StringArgumentType.getString(context, "channelName"));
                         return 1;
                     }))
                 .executes(context -> { // /channel leave (no args) -> leave focused if not alwaysOn
                     if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
-                        context.getSource().sendFailure(Component.literal("Players only.")); return 0;
+                        Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only.")); return 0;
                     }
                     ChatChannelManager.getFocusedChannelConfig(player).ifPresentOrElse(focused -> {
                         ChatChannelManager.leaveChannelCmd(player, focused.name);
-                    }, () -> player.sendSystemMessage(Component.literal("You are not focused on any channel to leave.").withStyle(ChatFormatting.YELLOW)));
+                    }, () -> Verbatim.gameContext.sendMessage(player, text("You are not focused on any channel to leave.").withColor(GameColor.YELLOW)));
                     return 1;
                 }))
             .executes(context -> showHelp(context.getSource()));
@@ -103,12 +100,12 @@ public class VerbatimCommands {
                 // Focus-only variant (no message supplied)
                 .executes(context -> {
                     if (!(context.getSource().getEntity() instanceof ServerPlayer sender)) {
-                        context.getSource().sendFailure(Component.literal("Players only."));
+                        Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only."));
                         return 0;
                     }
                     Collection<ServerPlayer> targets = EntityArgument.getPlayers(context, "targets");
                     if (targets.isEmpty()) {
-                        sender.sendSystemMessage(Component.literal("No valid player targets.").withStyle(ChatFormatting.RED));
+                        Verbatim.gameContext.sendMessage(sender, text("No valid player targets.").withColor(GameColor.RED));
                         return 0;
                     }
                     // Focus on the first target only (consistent with /r behaviour)
@@ -119,7 +116,7 @@ public class VerbatimCommands {
                 .then(Commands.argument("message", MessageArgument.message())
                     .executes(context -> {
                         if (!(context.getSource().getEntity() instanceof ServerPlayer sender)) {
-                            context.getSource().sendFailure(Component.literal("Players only."));
+                            Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only."));
                             return 0;
                         }
                         Collection<ServerPlayer> targets = EntityArgument.getPlayers(context, "targets");
@@ -136,12 +133,12 @@ public class VerbatimCommands {
             .then(Commands.argument("targets", EntityArgument.players())
                 .executes(context -> {
                     if (!(context.getSource().getEntity() instanceof ServerPlayer sender)) {
-                        context.getSource().sendFailure(Component.literal("Players only."));
+                        Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only."));
                         return 0;
                     }
                     Collection<ServerPlayer> targets = EntityArgument.getPlayers(context, "targets");
                     if (targets.isEmpty()) {
-                        sender.sendSystemMessage(Component.literal("No valid player targets.").withStyle(ChatFormatting.RED));
+                        Verbatim.gameContext.sendMessage(sender, text("No valid player targets.").withColor(GameColor.RED));
                         return 0;
                     }
                     ChatChannelManager.focusDm(sender, targets.iterator().next().getUUID());
@@ -150,7 +147,7 @@ public class VerbatimCommands {
                 .then(Commands.argument("message", MessageArgument.message())
                     .executes(context -> {
                         if (!(context.getSource().getEntity() instanceof ServerPlayer sender)) {
-                            context.getSource().sendFailure(Component.literal("Players only."));
+                            Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only."));
                             return 0;
                         }
                         Collection<ServerPlayer> targets = EntityArgument.getPlayers(context, "targets");
@@ -168,7 +165,7 @@ public class VerbatimCommands {
             .then(Commands.argument("message", MessageArgument.message())
                 .executes(context -> {
                     if (!(context.getSource().getEntity() instanceof ServerPlayer sender)) {
-                        context.getSource().sendFailure(Component.literal("Players only."));
+                        Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only."));
                         return 0;
                     }
                     String message = MessageArgument.getMessage(context, "message").getString();
@@ -177,7 +174,7 @@ public class VerbatimCommands {
             // No message -> just focus last DM sender (equivalent to d: prefix)
             .executes(context -> {
                 if (!(context.getSource().getEntity() instanceof ServerPlayer sender)) {
-                    context.getSource().sendFailure(Component.literal("Players only."));
+                    Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only."));
                     return 0;
                 }
                 ChatChannelManager.handleDPrefix(sender);
@@ -213,10 +210,7 @@ public class VerbatimCommands {
             .then(Commands.argument("target", StringArgumentType.string())
                 .suggests((context, builder) -> {
                     List<String> suggestions = new ArrayList<>();
-                    MinecraftServer server = context.getSource().getServer();
-                    if (server != null) {
-                        server.getPlayerList().getPlayers().forEach(player -> suggestions.add(player.getName().getString()));
-                    }
+                    Verbatim.gameContext.getAllOnlinePlayers().forEach(player -> suggestions.add(Verbatim.gameContext.getPlayerUsername(player)));
                     ChatChannelManager.getAllChannelConfigs().forEach(channel -> suggestions.add(channel.name));
                     return SharedSuggestionProvider.suggest(suggestions, builder);
                 })
@@ -260,7 +254,7 @@ public class VerbatimCommands {
             .then(Commands.literal("clear")
                 .executes(context -> {
                     if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
-                        context.getSource().sendFailure(Component.literal("Players only."));
+                        Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only."));
                         return 0;
                     }
                     return executeNickClear(player);
@@ -269,7 +263,7 @@ public class VerbatimCommands {
             .then(Commands.argument("nickname", StringArgumentType.greedyString())
                 .executes(context -> {
                     if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
-                        context.getSource().sendFailure(Component.literal("Players only."));
+                        Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only."));
                         return 0;
                     }
                     String nickname = StringArgumentType.getString(context, "nickname");
@@ -278,7 +272,7 @@ public class VerbatimCommands {
             // /nick - show current nickname
             .executes(context -> {
                 if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
-                    context.getSource().sendFailure(Component.literal("Players only."));
+                    Verbatim.gameContext.sendCommandFailure(context.getSource(), text("Players only."));
                     return 0;
                 }
                 return executeNickShow(player);
@@ -287,21 +281,19 @@ public class VerbatimCommands {
     }
 
     private static int executeCustomListCommand(CommandSourceStack source) {
-        MinecraftServer server = source.getServer();
-        PlayerList mcPlayerList = server.getPlayerList();
-        List<ServerPlayer> onlinePlayers = mcPlayerList.getPlayers();
+        List<ServerPlayer> onlinePlayers = Verbatim.gameContext.getAllOnlinePlayers();
 
         if (onlinePlayers.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("There are no players currently online.").withStyle(ChatFormatting.YELLOW), true);
+            Verbatim.gameContext.sendCommandSuccess(source, text("There are no players currently online.").withColor(GameColor.YELLOW), true);
             return 1;
         }
 
-        MutableComponent message = Component.literal("Online Players (" + onlinePlayers.size() + "):").withStyle(ChatFormatting.GOLD);
+        GameComponent message = text("Online Players (" + onlinePlayers.size() + "):").withColor(GameColor.GOLD);
 
         boolean anyPlayerHasCustomDisplayName = false;
         for (ServerPlayer player : onlinePlayers) {
-            String username = player.getName().getString();
-            String strippedDisplayName = ChatFormattingUtils.stripFormattingCodes(player.getDisplayName().getString());
+            String username = Verbatim.gameContext.getPlayerUsername(player);
+            String strippedDisplayName = ChatFormattingUtils.stripFormattingCodes(Verbatim.gameContext.getPlayerDisplayName(player));
             if (!username.equals(strippedDisplayName)) {
                 anyPlayerHasCustomDisplayName = true;
                 break;
@@ -309,168 +301,171 @@ public class VerbatimCommands {
         }
 
         for (ServerPlayer player : onlinePlayers) {
-            String username = player.getName().getString();
-            String strippedDisplayName = ChatFormattingUtils.stripFormattingCodes(player.getDisplayName().getString());
+            String username = Verbatim.gameContext.getPlayerUsername(player);
+            String strippedDisplayName = ChatFormattingUtils.stripFormattingCodes(Verbatim.gameContext.getPlayerDisplayName(player));
             boolean currentPlayerHasCustomDisplayName = !username.equals(strippedDisplayName);
 
-            message.append(Component.literal("\n - ")); // Newline and bullet point
+            message = message.append("\n - ");
 
-            ClickEvent clickEvent = new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/msg " + username + " ");
+            String clickCommand = "/msg " + username + " ";
 
             if (anyPlayerHasCustomDisplayName) {
                 if (currentPlayerHasCustomDisplayName) {
-                    message.append(Component.literal(strippedDisplayName)
-                        .withStyle(Style.EMPTY.withColor(ChatFormatting.YELLOW).withClickEvent(clickEvent)));
-                    message.append(Component.literal(" (" + username + ")").withStyle(ChatFormatting.GRAY)); // Username part not clickable if display name is primary
+                    message = message.append(text(strippedDisplayName)
+                        .withColor(GameColor.YELLOW)
+                        .withClickSuggestCommand(clickCommand));
+                    message = message.append(text(" (" + username + ")").withColor(GameColor.GRAY));
                 } else {
-                    message.append(Component.literal(username)
-                        .withStyle(Style.EMPTY.withColor(ChatFormatting.GRAY).withClickEvent(clickEvent)));
+                    message = message.append(text(username)
+                        .withColor(GameColor.GRAY)
+                        .withClickSuggestCommand(clickCommand));
                 }
-            } else { // No one has a custom display name, show all as yellow usernames
-                message.append(Component.literal(username)
-                    .withStyle(Style.EMPTY.withColor(ChatFormatting.YELLOW).withClickEvent(clickEvent)));
+            } else {
+                message = message.append(text(username)
+                    .withColor(GameColor.YELLOW)
+                    .withClickSuggestCommand(clickCommand));
             }
         }
 
-        source.sendSuccess(() -> message, true); // Ephemeral message
+        Verbatim.gameContext.sendCommandSuccess(source, message, true);
         return onlinePlayers.size();
     }
 
     private static int listOnlinePlayers(CommandSourceStack source) {
-        MinecraftServer server = source.getServer();
-        PlayerList playerList = server.getPlayerList();
-        List<ServerPlayer> onlinePlayers = playerList.getPlayers();
+        List<ServerPlayer> onlinePlayers = Verbatim.gameContext.getAllOnlinePlayers();
 
         if (onlinePlayers.isEmpty()) {
-            source.sendSuccess(() -> Component.literal("There are no players currently online. (vlist)").withStyle(ChatFormatting.YELLOW), true); 
+            Verbatim.gameContext.sendCommandSuccess(source, text("There are no players currently online. (vlist)").withColor(GameColor.YELLOW), true);
             return 1;
         }
 
-        MutableComponent message = Component.literal("Online Players (" + onlinePlayers.size() + ") [vlist]:\n").withStyle(ChatFormatting.GOLD);
+        GameComponent message = text("Online Players (" + onlinePlayers.size() + ") [vlist]:\n").withColor(GameColor.GOLD);
 
         for (ServerPlayer player : onlinePlayers) {
-            String username = player.getName().getString();
-            String strippedDisplayName = ChatFormattingUtils.stripFormattingCodes(player.getDisplayName().getString());
+            String username = Verbatim.gameContext.getPlayerUsername(player);
+            String strippedDisplayName = ChatFormattingUtils.stripFormattingCodes(Verbatim.gameContext.getPlayerDisplayName(player));
             String formattedName = username;
             if (!username.equals(strippedDisplayName)) {
                 formattedName = strippedDisplayName + " (" + username + ")";
             }
-            message.append(Component.literal(" - " + formattedName + "\n").withStyle(ChatFormatting.GREEN));
+            message = message.append(text(" - " + formattedName + "\n").withColor(GameColor.GREEN));
         }
-        source.sendSuccess(() -> message, true);
+        Verbatim.gameContext.sendCommandSuccess(source, message, true);
         return onlinePlayers.size();
     }
 
     private static int listChannels(CommandSourceStack source) {
-        MutableComponent message = Component.literal("Available Channels (Focusable/Joinable):\n").withStyle(ChatFormatting.GOLD);
+        GameComponent message = text("Available Channels (Focusable/Joinable):\n").withColor(GameColor.GOLD);
         Collection<ChatChannelManager.ChannelConfig> allChannels = ChatChannelManager.getAllChannelConfigs();
         if (allChannels.isEmpty()) {
-            source.sendFailure(Component.literal("No chat channels are currently configured.").withStyle(ChatFormatting.RED));
+            Verbatim.gameContext.sendCommandFailure(source, text("No chat channels are currently configured.").withColor(GameColor.RED));
             return 0;
         }
         for (ChatChannelManager.ChannelConfig channel : allChannels) {
-            message.append(ChatFormattingUtils.parseColors(channel.displayPrefix))
-                 .append(Component.literal(" " + channel.name).withStyle(ChatFormatting.YELLOW))
-                 .append(Component.literal(" (Shortcut: " + channel.shortcut + ")").withStyle(ChatFormatting.GRAY));
+            message = message.append(ChatFormattingUtils.parseColors(channel.displayPrefix))
+                 .append(text(" " + channel.name).withColor(GameColor.YELLOW))
+                 .append(text(" (Shortcut: " + channel.shortcut + ")").withColor(GameColor.GRAY));
             if (channel.range >= 0) {
-                message.append(Component.literal(" - Range: ").withStyle(ChatFormatting.GRAY))
-                     .append(Component.literal(String.valueOf(channel.range)).withStyle(ChatFormatting.AQUA));
+                message = message.append(text(" - Range: ").withColor(GameColor.GRAY))
+                     .append(text(String.valueOf(channel.range)).withColor(GameColor.AQUA));
             }
             if (channel.alwaysOn) {
-                message.append(Component.literal(" (Always On, Public)").withStyle(ChatFormatting.DARK_GRAY));
+                message = message.append(text(" (Always On, Public)").withColor(GameColor.DARK_GRAY));
             } else if (channel.permission.isEmpty()) {
-                 message.append(Component.literal(" (Public)").withStyle(ChatFormatting.GREEN));
+                 message = message.append(text(" (Public)").withColor(GameColor.GREEN));
             } else {
-                 message.append(Component.literal(" (Permission: ").withStyle(ChatFormatting.GRAY))
-                    .append(Component.literal(channel.permission.get()).withStyle(ChatFormatting.ITALIC))
-                    .append(Component.literal(")").withStyle(ChatFormatting.GRAY));
+                 message = message.append(text(" (Permission: ").withColor(GameColor.GRAY))
+                    .append(text(channel.permission.get()).withItalic(true))
+                    .append(text(")").withColor(GameColor.GRAY));
             }
-            message.append("\n");
+            message = message.append("\n");
         }
 
         if (source.getEntity() instanceof ServerPlayer player) {
             Set<String> joined = ChatChannelManager.getJoinedChannels(player);
+            final GameComponent[] messageHolder = {message};
             ChatChannelManager.getFocusedChannelConfig(player).ifPresent(focused -> {
-                 message.append(Component.literal("\nYour Focused Channel: ").withStyle(ChatFormatting.BLUE))
+                 messageHolder[0] = messageHolder[0].append(text("\nYour Focused Channel: ").withColor(GameColor.BLUE))
                     .append(ChatFormattingUtils.parseColors(focused.displayPrefix))
-                    .append(Component.literal(" " + focused.name).withStyle(ChatFormatting.BOLD));
+                    .append(text(" " + focused.name).withBold(true));
             });
+            message = messageHolder[0];
             if (!joined.isEmpty()) {
-                message.append(Component.literal("\nYour Joined Channels:\n").withStyle(ChatFormatting.BLUE));
+                message = message.append(text("\nYour Joined Channels:\n").withColor(GameColor.BLUE));
                 for (String joinedName : joined) {
+                    final GameComponent[] innerHolder = {message};
                     ChatChannelManager.getChannelConfigByName(joinedName).ifPresent(jc -> {
-                        message.append("  - ")
+                        innerHolder[0] = innerHolder[0].append("  - ")
                             .append(ChatFormattingUtils.parseColors(jc.displayPrefix))
-                            .append(Component.literal(" " + jc.name).withStyle(ChatFormatting.DARK_AQUA)).append("\n");
+                            .append(text(" " + jc.name).withColor(GameColor.DARK_AQUA)).append("\n");
                     });
+                    message = innerHolder[0];
                 }
             }
         }
-        source.sendSuccess(() -> message, false);
+        Verbatim.gameContext.sendCommandSuccess(source, message, false);
         return 1;
     }
 
     private static int showHelp(CommandSourceStack source) {
-        MutableComponent helpMessage = Component.literal("Verbatim Channel Commands:\n").withStyle(ChatFormatting.GOLD);
-        helpMessage.append("/channels or /channel list - Lists all available channels & your status.\n");
-        helpMessage.append("/channel focus <channelName> - Sets your active typing channel (also joins it).\n");
-        helpMessage.append("/channel join <channelName> - Joins a channel to receive messages.\n");
-        helpMessage.append("/channel leave <channelName> - Leaves a joined channel.\n");
-        helpMessage.append("/channel leave - Leaves your currently focused channel (if not alwaysOn).\n");
-        helpMessage.append("/channel help - Shows this help message.\n\n");
-        
-        helpMessage.append(Component.literal("Direct Message Commands:\n").withStyle(ChatFormatting.AQUA));
-        helpMessage.append("/msg <player> [message] - Focus DM with player (and send message if provided).\n");
-        helpMessage.append("/tell <player> [message] - Same as /msg.\n");
-        helpMessage.append("/r [message] - Reply to last DM sender (and send message if provided).\n\n");
-        
-        helpMessage.append(Component.literal("Chat Prefixes:\n").withStyle(ChatFormatting.GREEN));
-        helpMessage.append("d: - Focus on last DM sender (same as /r without message).\n");
-        helpMessage.append("g: - Switch to global chat.\n");
-        helpMessage.append(Component.literal("Use shortcuts like ").withStyle(ChatFormatting.GRAY))
-            .append(Component.literal("g: your message").withStyle(ChatFormatting.ITALIC))
-            .append(Component.literal(" to send to global (if shortcut is 'g') and focus it.").withStyle(ChatFormatting.GRAY));
-        source.sendSuccess(() -> helpMessage, false);
+        GameComponent helpMessage = text("Verbatim Channel Commands:\n").withColor(GameColor.GOLD)
+            .append("/channels or /channel list - Lists all available channels & your status.\n")
+            .append("/channel focus <channelName> - Sets your active typing channel (also joins it).\n")
+            .append("/channel join <channelName> - Joins a channel to receive messages.\n")
+            .append("/channel leave <channelName> - Leaves a joined channel.\n")
+            .append("/channel leave - Leaves your currently focused channel (if not alwaysOn).\n")
+            .append("/channel help - Shows this help message.\n\n")
+            .append(text("Direct Message Commands:\n").withColor(GameColor.AQUA))
+            .append("/msg <player> [message] - Focus DM with player (and send message if provided).\n")
+            .append("/tell <player> [message] - Same as /msg.\n")
+            .append("/r [message] - Reply to last DM sender (and send message if provided).\n\n")
+            .append(text("Chat Prefixes:\n").withColor(GameColor.GREEN))
+            .append("d: - Focus on last DM sender (same as /r without message).\n")
+            .append("g: - Switch to global chat.\n")
+            .append(text("Use shortcuts like ").withColor(GameColor.GRAY))
+            .append(text("g: your message").withItalic(true))
+            .append(text(" to send to global (if shortcut is 'g') and focus it.").withColor(GameColor.GRAY));
+        Verbatim.gameContext.sendCommandSuccess(source, helpMessage, false);
         return 1;
     }
 
     private static int sendDirectMessage(ServerPlayer sender, ServerPlayer target, String message) {
         // Focus sender on target
-        ChatChannelManager.focusDm(sender, target.getUUID());
-        
+        ChatChannelManager.focusDm(sender, Verbatim.gameContext.getPlayerUUID(target));
+
         // Update recipient's last incoming DM sender
-        ChatChannelManager.setLastIncomingDmSender(target, sender.getUUID());
-        
+        ChatChannelManager.setLastIncomingDmSender(target, Verbatim.gameContext.getPlayerUUID(sender));
+
         // Format and send DM messages
-        MutableComponent senderMessage = Component.literal("[You -> ")
-            .withStyle(ChatFormatting.LIGHT_PURPLE)
-            .append(Component.literal(target.getName().getString()).withStyle(ChatFormatting.YELLOW))
-            .append(Component.literal("]: ").withStyle(ChatFormatting.LIGHT_PURPLE))
+        GameComponent senderMessage = text("[You -> ")
+            .withColor(GameColor.LIGHT_PURPLE)
+            .append(text(Verbatim.gameContext.getPlayerUsername(target)).withColor(GameColor.YELLOW))
+            .append(text("]: ").withColor(GameColor.LIGHT_PURPLE))
             .append(ChatFormattingUtils.parsePlayerInputWithPermissions("&f", message, sender));
-            
-        MutableComponent recipientMessage = Component.literal("[")
-            .withStyle(ChatFormatting.LIGHT_PURPLE)
-            .append(Component.literal(sender.getName().getString()).withStyle(ChatFormatting.YELLOW))
-            .append(Component.literal(" -> You]: ").withStyle(ChatFormatting.LIGHT_PURPLE))
+
+        GameComponent recipientMessage = text("[")
+            .withColor(GameColor.LIGHT_PURPLE)
+            .append(text(Verbatim.gameContext.getPlayerUsername(sender)).withColor(GameColor.YELLOW))
+            .append(text(" -> You]: ").withColor(GameColor.LIGHT_PURPLE))
             .append(ChatFormattingUtils.parsePlayerInputWithPermissions("&f", message, sender));
-        
-        sender.sendSystemMessage(senderMessage);
-        target.sendSystemMessage(recipientMessage);
-        
-        Verbatim.LOGGER.debug("[Verbatim DM Command] DM sent from {} to {}: {}", sender.getName().getString(), target.getName().getString(), message);
+
+        Verbatim.gameContext.sendMessage(sender, senderMessage);
+        Verbatim.gameContext.sendMessage(target, recipientMessage);
+
+        Verbatim.LOGGER.debug("[Verbatim DM Command] DM sent from {} to {}: {}", Verbatim.gameContext.getPlayerUsername(sender), Verbatim.gameContext.getPlayerUsername(target), message);
         return 1;
     }
 
     private static int replyToLastDm(ServerPlayer sender, String message) {
         Optional<java.util.UUID> lastSenderOpt = ChatChannelManager.getLastIncomingDmSender(sender);
         if (lastSenderOpt.isEmpty()) {
-            sender.sendSystemMessage(Component.literal("No recent DMs to reply to.").withStyle(ChatFormatting.YELLOW));
+            Verbatim.gameContext.sendMessage(sender, text("No recent DMs to reply to.").withColor(GameColor.YELLOW));
             return 0;
         }
 
         ServerPlayer target = ChatChannelManager.getPlayerByUUID(lastSenderOpt.get());
         if (target == null) {
-            sender.sendSystemMessage(Component.literal("Cannot reply: Target player is not online.").withStyle(ChatFormatting.RED));
+            Verbatim.gameContext.sendMessage(sender, text("Cannot reply: Target player is not online.").withColor(GameColor.RED));
             return 0;
         }
 
@@ -480,41 +475,43 @@ public class VerbatimCommands {
     private static int executeChList(CommandSourceStack source, String targetName) {
         // Determine if targetName is a player or a channel
         MinecraftServer server = source.getServer();
-        ServerPlayer targetPlayer = server.getPlayerList().getPlayerByName(targetName);
+        ServerPlayer targetPlayer = Verbatim.gameContext.getPlayerByName(targetName);
 
         if (targetPlayer != null) {
             // Target is a player, list channels they are in
             Set<String> joinedChannels = ChatChannelManager.getJoinedChannels(targetPlayer);
             if (joinedChannels.isEmpty()) {
-                source.sendSuccess(() -> Component.literal(targetPlayer.getName().getString() + " is not in any channels.").withStyle(ChatFormatting.YELLOW), false);
+                Verbatim.gameContext.sendCommandSuccess(source, text(Verbatim.gameContext.getPlayerUsername(targetPlayer) + " is not in any channels.").withColor(GameColor.YELLOW), false);
                 return 1;
             }
-            MutableComponent message = Component.literal("Channels for " + targetPlayer.getName().getString() + ":\n").withStyle(ChatFormatting.GOLD);
+            GameComponent message = text("Channels for " + Verbatim.gameContext.getPlayerUsername(targetPlayer) + ":\n").withColor(GameColor.GOLD);
             for (String channelName : joinedChannels) {
+                final GameComponent[] messageHolder = {message};
                 ChatChannelManager.getChannelConfigByName(channelName).ifPresent(config -> {
-                    message.append(Component.literal(" - " + config.name).withStyle(ChatFormatting.AQUA))
-                           .append(Component.literal(" (" + config.displayPrefix + ")\n").withStyle(ChatFormatting.GRAY));
+                    messageHolder[0] = messageHolder[0].append(text(" - " + config.name).withColor(GameColor.AQUA))
+                           .append(text(" (" + config.displayPrefix + ")\n").withColor(GameColor.GRAY));
                 });
+                message = messageHolder[0];
             }
-            source.sendSuccess(() -> message, false);
+            Verbatim.gameContext.sendCommandSuccess(source, message, false);
         } else {
             // Target is potentially a channel, list players in it
             Optional<ChatChannelManager.ChannelConfig> channelConfigOpt = ChatChannelManager.getChannelConfigByName(targetName);
             if (channelConfigOpt.isPresent()) {
                 ChatChannelManager.ChannelConfig channelConfig = channelConfigOpt.get();
-                List<ServerPlayer> playersInChannel = ChatChannelManager.getPlayersInChannel(server, targetName); // Needs this new method in ChatChannelManager
-                
+                List<ServerPlayer> playersInChannel = ChatChannelManager.getPlayersInChannel(server, targetName);
+
                 if (playersInChannel.isEmpty()) {
-                    source.sendSuccess(() -> Component.literal("No players are in channel " + channelConfig.name + ".").withStyle(ChatFormatting.YELLOW), false);
+                    Verbatim.gameContext.sendCommandSuccess(source, text("No players are in channel " + channelConfig.name + ".").withColor(GameColor.YELLOW), false);
                     return 1;
                 }
-                MutableComponent message = Component.literal("Players in channel " + channelConfig.name + ":\n").withStyle(ChatFormatting.GOLD);
+                GameComponent message = text("Players in channel " + channelConfig.name + ":\n").withColor(GameColor.GOLD);
                 for (ServerPlayer p : playersInChannel) {
-                    message.append(Component.literal(" - " + p.getName().getString() + "\n").withStyle(ChatFormatting.AQUA));
+                    message = message.append(text(" - " + Verbatim.gameContext.getPlayerUsername(p) + "\n").withColor(GameColor.AQUA));
                 }
-                source.sendSuccess(() -> message, false);
+                Verbatim.gameContext.sendCommandSuccess(source, message, false);
             } else {
-                source.sendFailure(Component.literal("Target '" + targetName + "' is not a valid online player or channel name."));
+                Verbatim.gameContext.sendCommandFailure(source, text("Target '" + targetName + "' is not a valid online player or channel name."));
                 return 0;
             }
         }
@@ -525,13 +522,13 @@ public class VerbatimCommands {
         // This will call a new method in ChatChannelManager
         boolean success = ChatChannelManager.adminKickPlayerFromChannel(playerToKick, channelName, source.getPlayer()); // Pass command executor for feedback/logging
         if (success) {
-            source.sendSuccess(() -> Component.literal("Kicked " + playerToKick.getName().getString() + " from channel " + channelName + ".").withStyle(ChatFormatting.GREEN), true);
+            Verbatim.gameContext.sendCommandSuccess(source, text("Kicked " + Verbatim.gameContext.getPlayerUsername(playerToKick) + " from channel " + channelName + ".").withColor(GameColor.GREEN), true);
         } else {
             // ChatChannelManager should send more specific failure feedback
             // For example, if channel is alwaysOn, or player not in channel, or channel not found.
             // If ChatChannelManager doesn't send feedback for some reason, this is a fallback.
              if (!ChatChannelManager.getChannelConfigByName(channelName).map(c -> c.alwaysOn).orElse(false)) {
-                 source.sendFailure(Component.literal("Failed to kick " + playerToKick.getName().getString() + " from " + channelName + ". Player might not be in it or channel is always-on."));
+                 Verbatim.gameContext.sendCommandFailure(source, text("Failed to kick " + Verbatim.gameContext.getPlayerUsername(playerToKick) + " from " + channelName + ". Player might not be in it or channel is always-on."));
              }
         }
         return success ? 1 : 0;
@@ -540,34 +537,34 @@ public class VerbatimCommands {
     private static int executeNickShow(ServerPlayer player) {
         String currentNickname = NicknameService.getNickname(player);
         if (currentNickname != null) {
-            MutableComponent message = Component.literal("Your current nickname: ").withStyle(ChatFormatting.YELLOW);
-            message.append(ChatFormattingUtils.parseColors(currentNickname));
-            player.sendSystemMessage(message);
+            GameComponent message = text("Your current nickname: ").withColor(GameColor.YELLOW)
+                .append(ChatFormattingUtils.parseColors(currentNickname));
+            Verbatim.gameContext.sendMessage(player, message);
         } else {
-            player.sendSystemMessage(Component.literal("You don't have a nickname set.").withStyle(ChatFormatting.YELLOW));
+            Verbatim.gameContext.sendMessage(player, text("You don't have a nickname set.").withColor(GameColor.YELLOW));
         }
         return 1;
     }
 
     private static int executeNickSet(ServerPlayer player, String nickname) {
         if (nickname.length() > 64) { // Reasonable length limit
-            player.sendSystemMessage(Component.literal("Nickname is too long. Maximum 64 characters.").withStyle(ChatFormatting.RED));
+            Verbatim.gameContext.sendMessage(player, text("Nickname is too long. Maximum 64 characters.").withColor(GameColor.RED));
             return 0;
         }
 
         String processedNickname = NicknameService.setNickname(player, nickname);
 
         if (processedNickname != null) {
-            MutableComponent message = Component.literal("Nickname set to: ").withStyle(ChatFormatting.GREEN);
-            message.append(ChatFormattingUtils.parseColors(processedNickname));
-            player.sendSystemMessage(message);
+            GameComponent message = text("Nickname set to: ").withColor(GameColor.GREEN)
+                .append(ChatFormattingUtils.parseColors(processedNickname));
+            Verbatim.gameContext.sendMessage(player, message);
 
             // Show a note about formatting permissions if they were stripped
             if (!processedNickname.equals(nickname)) {
-                player.sendSystemMessage(Component.literal("Note: Color codes were removed due to missing permissions.").withStyle(ChatFormatting.GRAY));
+                Verbatim.gameContext.sendMessage(player, text("Note: Color codes were removed due to missing permissions.").withColor(GameColor.GRAY));
             }
         } else {
-            player.sendSystemMessage(Component.literal("Failed to set nickname.").withStyle(ChatFormatting.RED));
+            Verbatim.gameContext.sendMessage(player, text("Failed to set nickname.").withColor(GameColor.RED));
             return 0;
         }
         return 1;
@@ -576,9 +573,9 @@ public class VerbatimCommands {
     private static int executeNickClear(ServerPlayer player) {
         if (NicknameService.hasNickname(player)) {
             NicknameService.clearNickname(player);
-            player.sendSystemMessage(Component.literal("Nickname cleared.").withStyle(ChatFormatting.GREEN));
+            Verbatim.gameContext.sendMessage(player, text("Nickname cleared.").withColor(GameColor.GREEN));
         } else {
-            player.sendSystemMessage(Component.literal("You don't have a nickname set.").withStyle(ChatFormatting.YELLOW));
+            Verbatim.gameContext.sendMessage(player, text("You don't have a nickname set.").withColor(GameColor.YELLOW));
         }
         return 1;
     }
