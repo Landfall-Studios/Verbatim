@@ -198,7 +198,14 @@ public class LocalChannelFormatter {
         // Add player name
         Component playerNameComponent = ChatFormattingUtils.createPlayerNameComponent(sender, channelConfig.nameColor, false, channelConfig.nameStyle).toMinecraft();
         finalMessage.append(playerNameComponent);
-        finalMessage.append(Component.literal(" "));
+
+        // For roleplay messages starting with possessive 's, don't add space
+        // e.g., "Player's cat" not "Player 's cat"
+        boolean skipSpaceAfterName = applyPlusStyleFormatting && actualMessageContent.startsWith("'");
+
+        if (!skipSpaceAfterName) {
+            finalMessage.append(Component.literal(" "));
+        }
 
         // Add action text (if any)
         if (!localActionText.isEmpty()) {
