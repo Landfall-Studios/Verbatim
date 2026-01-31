@@ -1,7 +1,7 @@
 package world.landfall.verbatim.util;
 
-import net.minecraft.server.level.ServerPlayer;
 import world.landfall.verbatim.Verbatim;
+import world.landfall.verbatim.context.GamePlayer;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
@@ -19,10 +19,6 @@ public class PrefixService {
         Verbatim.LOGGER.info("[Verbatim PrefixService] PrefixService initialized. LuckPerms availability will be checked when first needed.");
     }
 
-    /**
-     * Lazy-load LuckPerms API. This is called on first prefix check.
-     * Uses reflection to avoid NoClassDefFoundError when LuckPerms is not installed.
-     */
     private void ensureLuckPermsChecked() {
         if (this.luckPermsAvailable == null) {
             try {
@@ -48,13 +44,7 @@ public class PrefixService {
         return this.luckPermsAvailable;
     }
 
-    /**
-     * Gets the player's prefix from LuckPerms.
-     *
-     * @param player The player to get the prefix for
-     * @return The prefix string, or empty string if none found
-     */
-    public String getPlayerPrefix(ServerPlayer player) {
+    public String getPlayerPrefix(GamePlayer player) {
         if (player == null) {
             return "";
         }
@@ -71,7 +61,6 @@ public class PrefixService {
                 String prefix = getPrefixFromUser(user);
                 return prefix != null ? prefix : "";
             } else {
-                // Try to load the user synchronously
                 try {
                     Object loadedUser = loadUser(player);
                     if (loadedUser != null) {
@@ -80,24 +69,18 @@ public class PrefixService {
                     }
                 } catch (Exception e) {
                     Verbatim.LOGGER.debug("[Verbatim PrefixService] Failed to load user '{}' for prefix: {}",
-                                        Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
+                                        player.getUsername(), e.getMessage());
                 }
             }
         } catch (Exception e) {
             Verbatim.LOGGER.debug("[Verbatim PrefixService] Error getting prefix for player '{}': {}",
-                                Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
+                                player.getUsername(), e.getMessage());
         }
 
         return "";
     }
 
-    /**
-     * Gets the player's primary group from LuckPerms.
-     *
-     * @param player The player to get the primary group for
-     * @return The primary group name, or empty string if none found
-     */
-    public String getPlayerPrimaryGroup(ServerPlayer player) {
+    public String getPlayerPrimaryGroup(GamePlayer player) {
         if (player == null) {
             return "";
         }
@@ -115,7 +98,6 @@ public class PrefixService {
                 String primaryGroup = (String) getPrimaryGroupMethod.invoke(user);
                 return primaryGroup != null ? primaryGroup : "";
             } else {
-                // Try to load the user synchronously
                 try {
                     Object loadedUser = loadUser(player);
                     if (loadedUser != null) {
@@ -125,24 +107,18 @@ public class PrefixService {
                     }
                 } catch (Exception e) {
                     Verbatim.LOGGER.debug("[Verbatim PrefixService] Failed to load user '{}' for primary group: {}",
-                                        Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
+                                        player.getUsername(), e.getMessage());
                 }
             }
         } catch (Exception e) {
             Verbatim.LOGGER.debug("[Verbatim PrefixService] Error getting primary group for player '{}': {}",
-                                Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
+                                player.getUsername(), e.getMessage());
         }
 
         return "";
     }
 
-    /**
-     * Gets all groups that the player is a member of.
-     *
-     * @param player The player to get groups for
-     * @return List of group names the player is in
-     */
-    public List<String> getPlayerGroups(ServerPlayer player) {
+    public List<String> getPlayerGroups(GamePlayer player) {
         List<String> groups = new ArrayList<>();
 
         if (player == null) {
@@ -160,7 +136,6 @@ public class PrefixService {
             if (user != null) {
                 extractGroupsFromUser(user, groups);
             } else {
-                // Try to load the user synchronously
                 try {
                     Object loadedUser = loadUser(player);
                     if (loadedUser != null) {
@@ -168,23 +143,17 @@ public class PrefixService {
                     }
                 } catch (Exception e) {
                     Verbatim.LOGGER.debug("[Verbatim PrefixService] Failed to load user '{}' for groups: {}",
-                                        Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
+                                        player.getUsername(), e.getMessage());
                 }
             }
         } catch (Exception e) {
             Verbatim.LOGGER.debug("[Verbatim PrefixService] Error getting groups for player '{}': {}",
-                                Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
+                                player.getUsername(), e.getMessage());
         }
 
         return groups;
     }
 
-    /**
-     * Gets the display name for a group from LuckPerms.
-     *
-     * @param groupName The name of the group
-     * @return The display name of the group, or the group name if no display name is set
-     */
     public String getGroupDisplayName(String groupName) {
         if (groupName == null || groupName.isEmpty()) {
             return "";
@@ -219,14 +188,7 @@ public class PrefixService {
         return groupName;
     }
 
-    /**
-     * Gets the prefix tooltip from LuckPerms meta data.
-     * Looks for a meta key like "prefix_tooltip.0" that corresponds to the prefix.
-     *
-     * @param player The player to get the prefix tooltip for
-     * @return The tooltip text, or null if no tooltip is defined
-     */
-    public String getPrefixTooltip(ServerPlayer player) {
+    public String getPrefixTooltip(GamePlayer player) {
         if (player == null) {
             return null;
         }
@@ -245,7 +207,6 @@ public class PrefixService {
                     return tooltip;
                 }
             } else {
-                // Try to load the user synchronously
                 try {
                     Object loadedUser = loadUser(player);
                     if (loadedUser != null) {
@@ -256,12 +217,12 @@ public class PrefixService {
                     }
                 } catch (Exception e) {
                     Verbatim.LOGGER.debug("[Verbatim PrefixService] Failed to load user '{}' for prefix tooltip: {}",
-                                        Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
+                                        player.getUsername(), e.getMessage());
                 }
             }
         } catch (Exception e) {
             Verbatim.LOGGER.debug("[Verbatim PrefixService] Error getting prefix tooltip for player '{}': {}",
-                                Verbatim.gameContext.getPlayerUsername(player), e.getMessage());
+                                player.getUsername(), e.getMessage());
         }
 
         return null;
@@ -269,34 +230,25 @@ public class PrefixService {
 
     // ===== Helper methods for reflection-based LuckPerms access =====
 
-    /**
-     * Gets a User object from LuckPerms for the given player.
-     */
-    private Object getUser(ServerPlayer player) throws Exception {
+    private Object getUser(GamePlayer player) throws Exception {
         Method getUserManagerMethod = this.luckPermsApi.getClass().getMethod("getUserManager");
         Object userManager = getUserManagerMethod.invoke(this.luckPermsApi);
 
         Method getUserMethod = userManager.getClass().getMethod("getUser", UUID.class);
-        return getUserMethod.invoke(userManager, Verbatim.gameContext.getPlayerUUID(player));
+        return getUserMethod.invoke(userManager, player.getUUID());
     }
 
-    /**
-     * Loads a User object from LuckPerms for the given player (synchronous).
-     */
-    private Object loadUser(ServerPlayer player) throws Exception {
+    private Object loadUser(GamePlayer player) throws Exception {
         Method getUserManagerMethod = this.luckPermsApi.getClass().getMethod("getUserManager");
         Object userManager = getUserManagerMethod.invoke(this.luckPermsApi);
 
         Method loadUserMethod = userManager.getClass().getMethod("loadUser", UUID.class);
-        Object completableFuture = loadUserMethod.invoke(userManager, Verbatim.gameContext.getPlayerUUID(player));
+        Object completableFuture = loadUserMethod.invoke(userManager, player.getUUID());
 
         Method getMethod = completableFuture.getClass().getMethod("get");
         return getMethod.invoke(completableFuture);
     }
 
-    /**
-     * Gets the CachedMetaData from a permission holder (User or Group).
-     */
     private Object getMetaDataFromHolder(Object holder) throws Exception {
         Method getCachedDataMethod = holder.getClass().getMethod("getCachedData");
         Object cachedData = getCachedDataMethod.invoke(holder);
@@ -305,9 +257,6 @@ public class PrefixService {
         return getMetaDataMethod.invoke(cachedData);
     }
 
-    /**
-     * Gets the prefix from a User object.
-     */
     private String getPrefixFromUser(Object user) throws Exception {
         Object metaData = getMetaDataFromHolder(user);
         if (metaData != null) {
@@ -317,9 +266,6 @@ public class PrefixService {
         return null;
     }
 
-    /**
-     * Extracts group names from a User's nodes.
-     */
     @SuppressWarnings("unchecked")
     private void extractGroupsFromUser(Object user, List<String> groups) throws Exception {
         Method getNodesMethod = user.getClass().getMethod("getNodes");
@@ -345,15 +291,11 @@ public class PrefixService {
         }
     }
 
-    /**
-     * Finds a prefix tooltip from a User's meta data.
-     */
     private String findPrefixTooltip(Object user) throws Exception {
         Object metaData = getMetaDataFromHolder(user);
         if (metaData != null) {
             Method getMetaValueMethod = metaData.getClass().getMethod("getMetaValue", String.class);
 
-            // Look for prefix_tooltip meta keys (e.g., "prefix_tooltip.0", "prefix_tooltip.1", etc.)
             for (int i = 0; i < 10; i++) {
                 String tooltipKey = "prefix_tooltip." + i;
                 String tooltip = (String) getMetaValueMethod.invoke(metaData, tooltipKey);

@@ -1,6 +1,5 @@
 package world.landfall.verbatim.context;
 
-import net.minecraft.network.chat.Component;
 import world.landfall.verbatim.Verbatim;
 
 /**
@@ -33,14 +32,5 @@ public final class GameText {
      */
     public static GameComponent empty() {
         return Verbatim.gameContext.createEmpty();
-    }
-
-    /**
-     * Wraps a Minecraft Component into a GameComponent.
-     * @param component the Minecraft component
-     * @return the wrapped GameComponent
-     */
-    public static GameComponent wrap(Component component) {
-        return Verbatim.gameContext.wrapComponent(component);
     }
 }

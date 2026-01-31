@@ -1,8 +1,8 @@
 package world.landfall.verbatim.chat;
 
 import java.util.UUID;
-import net.minecraft.server.level.ServerPlayer;
 import world.landfall.verbatim.ChatChannelManager;
+import world.landfall.verbatim.context.GamePlayer;
 
 public class ChatFocus extends FocusTarget {
     private final FocusType type;
@@ -41,8 +41,8 @@ public class ChatFocus extends FocusTarget {
     @Override
     public String getDisplayName() {
         if (type == FocusType.DM) {
-            ServerPlayer player = ChatChannelManager.getPlayerByUUID((UUID) identifier);
-            return player != null ? "DM with " + player.getName().getString() : "DM with offline player";
+            GamePlayer player = ChatChannelManager.getPlayerByUUID((UUID) identifier);
+            return player != null ? "DM with " + player.getUsername() : "DM with offline player";
         } else {
             return ChatChannelManager.getChannelConfigByName((String) identifier)
                 .map(config -> config.displayPrefix + " " + config.name)
@@ -70,4 +70,4 @@ public class ChatFocus extends FocusTarget {
     public int hashCode() {
         return 31 * type.hashCode() + identifier.hashCode();
     }
-} 
+}

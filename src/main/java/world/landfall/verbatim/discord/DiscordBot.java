@@ -7,11 +7,10 @@ import net.dv8tion.jda.api.entities.Activity;
 import net.dv8tion.jda.api.entities.channel.concrete.TextChannel;
 import net.dv8tion.jda.api.requests.GatewayIntent;
 import net.dv8tion.jda.api.utils.MemberCachePolicy;
-import net.minecraft.server.level.ServerPlayer;
 import world.landfall.verbatim.Verbatim;
-import world.landfall.verbatim.VerbatimConfig;
-import world.landfall.verbatim.ChatFormattingUtils;
 import world.landfall.verbatim.NameStyle;
+import world.landfall.verbatim.context.GamePlayer;
+import world.landfall.verbatim.util.FormattingCodeUtils;
 
 import java.awt.Color;
 import java.util.HashMap;
@@ -26,8 +25,8 @@ public class DiscordBot {
     private static final Map<UUID, Color> SPECIAL_UUID_COLORS = new HashMap<>();
 
     static {
-        SPECIAL_UUID_COLORS.put(UUID.fromString("7755ac32-2fba-4ef6-a85b-93c354267a91"), new Color(155, 89, 182)); // cant blame a gal for liking purple ;)
-        SPECIAL_UUID_COLORS.put(UUID.fromString("886f738d-8d9a-4ba9-9148-af80e82dd744"), new Color(130, 35, 109)); // ty mallow for helping with 830!!
+        SPECIAL_UUID_COLORS.put(UUID.fromString("7755ac32-2fba-4ef6-a85b-93c354267a91"), new Color(155, 89, 182));
+        SPECIAL_UUID_COLORS.put(UUID.fromString("886f738d-8d9a-4ba9-9148-af80e82dd744"), new Color(130, 35, 109));
     }
 
     private static JDA jdaInstance;
@@ -38,17 +37,17 @@ public class DiscordBot {
     private static ScheduledExecutorService presenceScheduler;
 
     public static void init() {
-        enabled = VerbatimConfig.DISCORD_BOT_ENABLED.get();
-        useEmbedMode = VerbatimConfig.DISCORD_USE_EMBED_MODE.get();
-        String nameStyleConfig = VerbatimConfig.DISCORD_NAME_STYLE.get();
+        enabled = Verbatim.gameConfig.isDiscordEnabled();
+        useEmbedMode = Verbatim.gameConfig.isDiscordUseEmbedMode();
+        String nameStyleConfig = Verbatim.gameConfig.getDiscordNameStyle();
         discordNameStyle = NameStyle.fromConfigValue(nameStyleConfig);
         if (!enabled) {
             Verbatim.LOGGER.info("[Verbatim Discord] Bot is disabled in config.");
             return;
         }
 
-        String botToken = VerbatimConfig.DISCORD_BOT_TOKEN.get();
-        discordChannelId = VerbatimConfig.DISCORD_CHANNEL_ID.get();
+        String botToken = Verbatim.gameConfig.getDiscordBotToken();
+        discordChannelId = Verbatim.gameConfig.getDiscordChannelId();
 
         if (botToken == null || botToken.isEmpty() || botToken.equals("YOUR_DISCORD_BOT_TOKEN_HERE")) {
             Verbatim.LOGGER.error("[Verbatim Discord] Bot token is not configured. Discord bot will not start.");
@@ -68,12 +67,10 @@ public class DiscordBot {
             jdaInstance.awaitReady();
             Verbatim.LOGGER.info("[Verbatim Discord] Bot connected and ready!");
 
-            // Register Discord slash commands
             jdaInstance.upsertCommand("list", "Lists online players on the Minecraft server.").queue();
             Verbatim.LOGGER.info("[Verbatim Discord] /list slash command registered/updated.");
 
-            // Initialize and start presence scheduler
-            updatePlayerCountStatus(); // Set initial status
+            updatePlayerCountStatus();
             presenceScheduler = Executors.newSingleThreadScheduledExecutor();
             presenceScheduler.scheduleAtFixedRate(DiscordBot::updatePlayerCountStatus, 1, 1, TimeUnit.MINUTES);
             Verbatim.LOGGER.info("[Verbatim Discord] Presence update scheduler started.");
@@ -137,25 +134,21 @@ public class DiscordBot {
     }
 
     private static Color generateColorFromUUID(UUID uuid) {
-        // Check for the special UUID in the map first
         if (SPECIAL_UUID_COLORS.containsKey(uuid)) {
             return SPECIAL_UUID_COLORS.get(uuid);
         }
-        
-        // Existing HSB-based generation for all other UUIDs
+
         int hash = uuid.hashCode();
         float hue = (Math.abs(hash) % 360) / 360.0f;
         return Color.getHSBColor(hue, 0.7f, 0.85f);
     }
 
-    private static String getPlayerAvatarUrl(ServerPlayer player) {
-        String username = Verbatim.gameContext.getPlayerUsername(player);
-
-        // Use Minotar with username for better reliability
+    private static String getPlayerAvatarUrl(GamePlayer player) {
+        String username = player.getUsername();
         return "https://minotar.net/avatar/" + username;
     }
 
-    public static void sendPlayerChatMessageToDiscord(ServerPlayer player, String messageContent) {
+    public static void sendPlayerChatMessageToDiscord(GamePlayer player, String messageContent) {
         if (!isEnabled()) {
             return;
         }
@@ -167,8 +160,8 @@ public class DiscordBot {
                 return;
             }
 
-            String cleanMessageContent = ChatFormattingUtils.stripFormattingCodes(messageContent);
-            String authorName = ChatFormattingUtils.createDiscordPlayerName(player, discordNameStyle);
+            String cleanMessageContent = FormattingCodeUtils.stripFormattingCodes(messageContent);
+            String authorName = Verbatim.chatFormatter.createDiscordPlayerName(player, discordNameStyle);
 
             if (useEmbedMode) {
                 String avatarUrl = getPlayerAvatarUrl(player);
@@ -176,7 +169,7 @@ public class DiscordBot {
                 EmbedBuilder embed = new EmbedBuilder();
                 embed.setAuthor(authorName, null, avatarUrl);
                 embed.setDescription(cleanMessageContent);
-                embed.setColor(generateColorFromUUID(Verbatim.gameContext.getPlayerUUID(player)));
+                embed.setColor(generateColorFromUUID(player.getUUID()));
 
                 channel.sendMessageEmbeds(embed.build()).queue();
                 Verbatim.LOGGER.debug("[Game -> Discord Embed] Relayed for {}: {}", authorName, cleanMessageContent);
@@ -186,11 +179,11 @@ public class DiscordBot {
                 Verbatim.LOGGER.debug("[Game -> Discord Plain] Relayed for {}: {}", authorName, cleanMessageContent);
             }
         } catch (Exception e) {
-            Verbatim.LOGGER.error("[Verbatim Discord] Could not send player chat message to Discord for {}.", Verbatim.gameContext.getPlayerUsername(player), e);
+            Verbatim.LOGGER.error("[Verbatim Discord] Could not send player chat message to Discord for {}.", player.getUsername(), e);
         }
     }
 
-    public static void sendPlayerConnectionStatusToDiscord(ServerPlayer player, boolean joined) {
+    public static void sendPlayerConnectionStatusToDiscord(GamePlayer player, boolean joined) {
         if (!isEnabled()) {
             return;
         }
@@ -201,8 +194,8 @@ public class DiscordBot {
                 Verbatim.LOGGER.warn("[Verbatim Discord] Configured Discord channel ID '{}' not found for connection status.", discordChannelId);
                 return;
             }
-            
-            String effectiveName = ChatFormattingUtils.createDiscordPlayerName(player, discordNameStyle);
+
+            String effectiveName = Verbatim.chatFormatter.createDiscordPlayerName(player, discordNameStyle);
 
             if (useEmbedMode) {
                 String avatarUrl = getPlayerAvatarUrl(player);
@@ -210,29 +203,28 @@ public class DiscordBot {
                 EmbedBuilder embed = new EmbedBuilder();
                 embed.setColor(joined ? new Color(0x4CAF50) : new Color(0xF44336));
                 embed.setAuthor(effectiveName + (joined ? " has joined the server." : " has left the server."), null, avatarUrl);
-                
+
                 channel.sendMessageEmbeds(embed.build()).queue();
                 Verbatim.LOGGER.debug("[Game -> Discord Embed] Connection Status: {} {}", effectiveName, (joined ? "joined" : "left"));
             } else {
-                String statusEmoji = joined ? "➕" : "➖";
+                String statusEmoji = joined ? "+" : "-";
                 String plainTextMessage = statusEmoji + " " + effectiveName + " has " + (joined ? "joined" : "left") + " the server.";
                 channel.sendMessage(plainTextMessage).queue();
                 Verbatim.LOGGER.debug("[Game -> Discord Plain] Connection Status: {} {}", effectiveName, (joined ? "joined" : "left"));
             }
-            // Update presence immediately after join/leave event
             updatePlayerCountStatus();
 
         } catch (Exception e) {
-            Verbatim.LOGGER.error("[Verbatim Discord] Could not send player connection status to Discord for {}.", Verbatim.gameContext.getPlayerUsername(player), e);
+            Verbatim.LOGGER.error("[Verbatim Discord] Could not send player connection status to Discord for {}.", player.getUsername(), e);
         }
     }
 
     public static String getDiscordMessagePrefix() {
-        return VerbatimConfig.DISCORD_MESSAGE_PREFIX.get();
+        return Verbatim.gameConfig.getDiscordMessagePrefix();
     }
 
     public static String getDiscordMessageSeparator() {
-        return VerbatimConfig.DISCORD_MESSAGE_SEPARATOR.get();
+        return Verbatim.gameConfig.getDiscordMessageSeparator();
     }
 
     public static boolean isEnabled() {
@@ -241,11 +233,11 @@ public class DiscordBot {
 
     public static void updatePlayerCountStatus() {
         if (jdaInstance == null || !jdaInstance.getStatus().isInit()) {
-            return; // JDA not ready
+            return;
         }
 
         String statusMessage;
-        if (Verbatim.gameContext.getServer() != null) {
+        if (Verbatim.gameContext.isServerAvailable()) {
             int playerCount = Verbatim.gameContext.getOnlinePlayerCount();
             if (playerCount == 1) {
                 statusMessage = "1 player online";
@@ -262,4 +254,4 @@ public class DiscordBot {
             Verbatim.LOGGER.warn("[Verbatim Discord] Could not update bot presence: {}", e.getMessage());
         }
     }
-} 
+}

@@ -1,5 +1,6 @@
-package world.landfall.verbatim;
+package world.landfall.verbatim.platform.neoforge;
 
+import world.landfall.verbatim.Verbatim;
 import com.electronwill.nightconfig.core.CommentedConfig;
 import com.electronwill.nightconfig.core.UnmodifiableConfig;
 import com.electronwill.nightconfig.toml.TomlFormat;

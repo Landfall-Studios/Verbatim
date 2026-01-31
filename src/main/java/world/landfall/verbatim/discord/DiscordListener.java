@@ -6,22 +6,12 @@ import net.dv8tion.jda.api.events.message.MessageReceivedEvent;
 import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent;
 import net.dv8tion.jda.api.entities.Message;
-import net.dv8tion.jda.api.entities.emoji.Emoji;
 import net.dv8tion.jda.api.entities.emoji.CustomEmoji;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
-import net.minecraft.network.chat.HoverEvent;
-import net.minecraft.network.chat.ClickEvent;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.players.PlayerList;
-import net.minecraft.ChatFormatting;
 import world.landfall.verbatim.Verbatim;
-import world.landfall.verbatim.VerbatimConfig;
-import world.landfall.verbatim.ChatFormattingUtils;
 import world.landfall.verbatim.context.GameColor;
 import world.landfall.verbatim.context.GameComponent;
+import world.landfall.verbatim.context.GamePlayer;
+import world.landfall.verbatim.util.FormattingCodeUtils;
 import static world.landfall.verbatim.context.GameText.*;
 
 import javax.annotation.Nonnull;
@@ -39,24 +29,22 @@ public class DiscordListener extends ListenerAdapter {
             return;
         }
 
-        String configuredChannelId = world.landfall.verbatim.VerbatimConfig.DISCORD_CHANNEL_ID.get();
+        String configuredChannelId = Verbatim.gameConfig.getDiscordChannelId();
         if (!event.getChannel().getId().equals(configuredChannelId)) {
             return;
         }
 
-        // Get content that properly formats emojis
         String originalMessageContent = event.getMessage().getContentRaw()
             .replace("[", "\\[")
             .replace("]", "\\]");
-        
-        // Handle custom emojis - replace with their names
+
         String processedContent = originalMessageContent;
         for (CustomEmoji emoji : event.getMessage().getMentions().getCustomEmojis()) {
             String emojiMention = emoji.getAsMention();
             String emojiName = ":" + emoji.getName() + ":";
             processedContent = processedContent.replace(emojiMention, emojiName);
         }
-        
+
         if (processedContent.trim().isEmpty() && event.getMessage().getAttachments().isEmpty()) {
             return;
         }
@@ -83,21 +71,19 @@ public class DiscordListener extends ListenerAdapter {
         final int TRUNCATION_MARKER_LEN = TRUNCATION_MARKER.length();
 
         if (!prefixStr.isEmpty()) {
-            GameComponent prefixComponent = ChatFormattingUtils.parseColors(prefixStr + " ");
+            GameComponent prefixComponent = Verbatim.chatFormatter.parseColors(prefixStr + " ");
             finalMessage = finalMessage.append(prefixComponent);
-            currentLength += ChatFormattingUtils.stripFormattingCodes(prefixComponent.getString()).length();
+            currentLength += FormattingCodeUtils.stripFormattingCodes(prefixComponent.getString()).length();
         }
 
         finalMessage = finalMessage.append(text(authorName));
         currentLength += authorName.length();
 
-        finalMessage = finalMessage.append(ChatFormattingUtils.parseColors(separatorStr));
-        currentLength += ChatFormattingUtils.stripFormattingCodes(separatorStr).length();
+        finalMessage = finalMessage.append(Verbatim.chatFormatter.parseColors(separatorStr));
+        currentLength += FormattingCodeUtils.stripFormattingCodes(separatorStr).length();
 
-        // Calculate remaining length for content
         int remainingLength = MAX_LENGTH - currentLength - TRUNCATION_MARKER_LEN;
 
-        // Handle message content first
         String contentStr = processedContent.trim();
         if (!contentStr.isEmpty()) {
             if (contentStr.length() > remainingLength) {
@@ -115,14 +101,12 @@ public class DiscordListener extends ListenerAdapter {
             }
         }
 
-        // Handle attachments if we have room
         if (remainingLength > 0) {
             List<Message.Attachment> attachments = event.getMessage().getAttachments();
             for (Message.Attachment attachment : attachments) {
                 String fileName = attachment.getFileName();
                 String proxyUrl = attachment.getProxyUrl();
 
-                // Check if we have room for this attachment (+2 for brackets)
                 if (fileName.length() + 2 > remainingLength) {
                     finalMessage = finalMessage.append(text(TRUNCATION_MARKER).withColor(GameColor.DARK_GRAY));
                     break;
@@ -136,7 +120,6 @@ public class DiscordListener extends ListenerAdapter {
                 finalMessage = finalMessage.append(attachmentComponent);
                 remainingLength -= (fileName.length() + 2);
 
-                // Add space if we have more attachments and room
                 if (attachments.indexOf(attachment) < attachments.size() - 1 && remainingLength > 1) {
                     finalMessage = finalMessage.append(text(" "));
                     remainingLength--;
@@ -144,12 +127,11 @@ public class DiscordListener extends ListenerAdapter {
             }
         }
 
-        MinecraftServer server = Verbatim.gameContext.getServer();
-        if (server != null) {
+        if (Verbatim.gameContext.isServerAvailable()) {
             Verbatim.gameContext.broadcastMessage(finalMessage, false);
             Verbatim.LOGGER.debug("[Discord -> Game] {} ({}) relayed to game chat.", authorName, author.getId());
         } else {
-            Verbatim.LOGGER.warn("[Verbatim Discord] MinecraftServer instance is null, cannot send message to game.");
+            Verbatim.LOGGER.warn("[Verbatim Discord] Server instance is null, cannot send message to game.");
         }
     }
 
@@ -161,13 +143,12 @@ public class DiscordListener extends ListenerAdapter {
         }
 
         if (event.getName().equals("list")) {
-            MinecraftServer server = Verbatim.gameContext.getServer();
-            if (server == null) {
+            if (!Verbatim.gameContext.isServerAvailable()) {
                 event.reply("Could not connect to the Minecraft server to fetch the player list.").setEphemeral(true).queue();
                 return;
             }
 
-            List<ServerPlayer> onlinePlayers = Verbatim.gameContext.getAllOnlinePlayers();
+            List<GamePlayer> onlinePlayers = Verbatim.gameContext.getAllOnlinePlayers();
 
             if (onlinePlayers.isEmpty()) {
                 event.reply("There are no players currently online on the Minecraft server.").setEphemeral(true).queue();
@@ -176,15 +157,15 @@ public class DiscordListener extends ListenerAdapter {
 
             String playerListString = onlinePlayers.stream()
                 .map(player -> {
-                    String username = Verbatim.gameContext.getPlayerUsername(player);
-                    String strippedDisplayName = ChatFormattingUtils.stripFormattingCodes(Verbatim.gameContext.getPlayerDisplayName(player));
+                    String username = player.getUsername();
+                    String strippedDisplayName = FormattingCodeUtils.stripFormattingCodes(player.getDisplayName());
                     if (!username.equals(strippedDisplayName)) {
                         return strippedDisplayName + " (" + username + ")";
                     }
                     return username;
                 })
                 .collect(Collectors.joining("\n- ", "**Online Players (" + onlinePlayers.size() + "):**\n- ", ""));
-            
+
             if (playerListString.length() > 1990) {
                 playerListString = playerListString.substring(0, 1990) + "... (list truncated)";
             }

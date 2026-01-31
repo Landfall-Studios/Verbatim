@@ -1,51 +1,60 @@
 package world.landfall.verbatim.context;
 
-import net.minecraft.ChatFormatting;
-
 /**
  * Platform-independent color enumeration for text styling.
+ * Each color stores its formatting code character and RGB value.
  */
 public enum GameColor {
-    BLACK(ChatFormatting.BLACK),
-    DARK_BLUE(ChatFormatting.DARK_BLUE),
-    DARK_GREEN(ChatFormatting.DARK_GREEN),
-    DARK_AQUA(ChatFormatting.DARK_AQUA),
-    DARK_RED(ChatFormatting.DARK_RED),
-    DARK_PURPLE(ChatFormatting.DARK_PURPLE),
-    GOLD(ChatFormatting.GOLD),
-    GRAY(ChatFormatting.GRAY),
-    DARK_GRAY(ChatFormatting.DARK_GRAY),
-    BLUE(ChatFormatting.BLUE),
-    GREEN(ChatFormatting.GREEN),
-    AQUA(ChatFormatting.AQUA),
-    RED(ChatFormatting.RED),
-    LIGHT_PURPLE(ChatFormatting.LIGHT_PURPLE),
-    YELLOW(ChatFormatting.YELLOW),
-    WHITE(ChatFormatting.WHITE);
+    BLACK('0', 0x000000),
+    DARK_BLUE('1', 0x0000AA),
+    DARK_GREEN('2', 0x00AA00),
+    DARK_AQUA('3', 0x00AAAA),
+    DARK_RED('4', 0xAA0000),
+    DARK_PURPLE('5', 0xAA00AA),
+    GOLD('6', 0xFFAA00),
+    GRAY('7', 0xAAAAAA),
+    DARK_GRAY('8', 0x555555),
+    BLUE('9', 0x5555FF),
+    GREEN('a', 0x55FF55),
+    AQUA('b', 0x55FFFF),
+    RED('c', 0xFF5555),
+    LIGHT_PURPLE('d', 0xFF55FF),
+    YELLOW('e', 0xFFFF55),
+    WHITE('f', 0xFFFFFF);
 
-    private final ChatFormatting minecraftFormatting;
+    private final char code;
+    private final int rgb;
 
-    GameColor(ChatFormatting formatting) {
-        this.minecraftFormatting = formatting;
+    GameColor(char code, int rgb) {
+        this.code = code;
+        this.rgb = rgb;
     }
 
     /**
-     * Gets the Minecraft ChatFormatting equivalent.
-     * This is the only place that references the Minecraft-specific type.
+     * Gets the formatting code character (e.g., '0' for BLACK, 'a' for GREEN).
      */
-    public ChatFormatting toMinecraft() {
-        return minecraftFormatting;
+    public char getCode() {
+        return code;
     }
 
     /**
-     * Converts a Minecraft ChatFormatting to GameColor.
+     * Gets the RGB color value.
      */
-    public static GameColor fromMinecraft(ChatFormatting formatting) {
+    public int getRgb() {
+        return rgb;
+    }
+
+    /**
+     * Finds a GameColor by its formatting code character.
+     * @return the matching GameColor, or WHITE as fallback
+     */
+    public static GameColor fromCode(char code) {
+        char lower = Character.toLowerCase(code);
         for (GameColor color : values()) {
-            if (color.minecraftFormatting == formatting) {
+            if (color.code == lower) {
                 return color;
             }
         }
-        return WHITE; // Default fallback
+        return WHITE;
     }
 }

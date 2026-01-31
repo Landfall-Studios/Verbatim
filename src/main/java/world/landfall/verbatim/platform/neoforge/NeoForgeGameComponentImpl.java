@@ -1,4 +1,4 @@
-package world.landfall.verbatim.context;
+package world.landfall.verbatim.platform.neoforge;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.ClickEvent;
@@ -6,40 +6,62 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
+import world.landfall.verbatim.context.GameColor;
+import world.landfall.verbatim.context.GameComponent;
 
 /**
- * Implementation of GameComponent that wraps Minecraft's MutableComponent.
+ * NeoForge implementation of GameComponent that wraps Minecraft's MutableComponent.
  */
-public class GameComponentImpl implements GameComponent {
+public class NeoForgeGameComponentImpl implements GameComponent {
 
     private MutableComponent wrapped;
 
-    public GameComponentImpl(MutableComponent component) {
+    public NeoForgeGameComponentImpl(MutableComponent component) {
         this.wrapped = component;
     }
 
-    public GameComponentImpl(String text) {
+    public NeoForgeGameComponentImpl(String text) {
         this.wrapped = Component.literal(text);
     }
 
     public static GameComponent empty() {
-        return new GameComponentImpl(Component.empty());
+        return new NeoForgeGameComponentImpl(Component.empty());
     }
 
     public static GameComponent literal(String text) {
-        return new GameComponentImpl(Component.literal(text));
+        return new NeoForgeGameComponentImpl(Component.literal(text));
     }
 
     public static GameComponent wrap(Component component) {
         if (component instanceof MutableComponent mutable) {
-            return new GameComponentImpl(mutable);
+            return new NeoForgeGameComponentImpl(mutable);
         }
-        return new GameComponentImpl(component.copy());
+        return new NeoForgeGameComponentImpl(component.copy());
+    }
+
+    /**
+     * Gets the underlying Minecraft Component.
+     * Only call from platform layer code.
+     */
+    public Component toMinecraft() {
+        return wrapped;
+    }
+
+    /**
+     * Gets the underlying Minecraft MutableComponent.
+     * Only call from platform layer code.
+     */
+    public MutableComponent toMinecraftMutable() {
+        return wrapped;
     }
 
     @Override
     public GameComponent append(GameComponent component) {
-        wrapped.append(component.toMinecraft());
+        if (component instanceof NeoForgeGameComponentImpl impl) {
+            wrapped.append(impl.toMinecraft());
+        } else {
+            wrapped.append(Component.literal(component.getString()));
+        }
         return this;
     }
 
@@ -51,7 +73,7 @@ public class GameComponentImpl implements GameComponent {
 
     @Override
     public GameComponent withColor(GameColor color) {
-        wrapped = wrapped.withStyle(color.toMinecraft());
+        wrapped = wrapped.withStyle(NeoForgeColorBridge.toMinecraft(color));
         return this;
     }
 
@@ -115,8 +137,14 @@ public class GameComponentImpl implements GameComponent {
 
     @Override
     public GameComponent withHoverText(GameComponent text) {
+        Component hoverComponent;
+        if (text instanceof NeoForgeGameComponentImpl impl) {
+            hoverComponent = impl.toMinecraft();
+        } else {
+            hoverComponent = Component.literal(text.getString());
+        }
         wrapped = wrapped.withStyle(wrapped.getStyle().withHoverEvent(
-            new HoverEvent(HoverEvent.Action.SHOW_TEXT, text.toMinecraft())));
+            new HoverEvent(HoverEvent.Action.SHOW_TEXT, hoverComponent)));
         return this;
     }
 
@@ -134,16 +162,6 @@ public class GameComponentImpl implements GameComponent {
 
     @Override
     public GameComponent copy() {
-        return new GameComponentImpl(wrapped.copy());
-    }
-
-    @Override
-    public Component toMinecraft() {
-        return wrapped;
-    }
-
-    @Override
-    public MutableComponent toMinecraftMutable() {
-        return wrapped;
+        return new NeoForgeGameComponentImpl(wrapped.copy());
     }
 }
