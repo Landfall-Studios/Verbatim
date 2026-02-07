@@ -3,6 +3,7 @@ package world.landfall.verbatim.test;
 import org.junit.jupiter.api.BeforeEach;
 import world.landfall.verbatim.ChatChannelManager;
 import world.landfall.verbatim.Verbatim;
+import world.landfall.verbatim.util.SocialService;
 
 /**
  * Base class for Verbatim unit tests.
@@ -31,8 +32,9 @@ public abstract class VerbatimTestBase {
         Verbatim.channelFormatter = channelFormatter;
         Verbatim.permissionService = permissionService;
 
-        // Reset ChatChannelManager state
+        // Reset ChatChannelManager and SocialService state
         ChatChannelManager.reset();
+        SocialService.reset();
     }
 
     /**
