@@ -59,6 +59,29 @@ public class ChatChannelManager {
     private static final Map<String, ChannelConfig> channelConfigsByName = new HashMap<>();
     private static final Map<String, ChannelConfig> channelConfigsByShortcut = new HashMap<>();
 
+    /**
+     * Resets all state. Used for unit testing.
+     */
+    public static void reset() {
+        isInitialized = false;
+        playerFocus.clear();
+        joinedChannels.clear();
+        lastIncomingDmSender.clear();
+        channelConfigsByName.clear();
+        channelConfigsByShortcut.clear();
+    }
+
+    /**
+     * Adds a channel config directly. Used for unit testing.
+     */
+    public static void addChannelConfig(ChannelConfig config) {
+        channelConfigsByName.put(config.name, config);
+        if (config.shortcut != null && !config.shortcut.isEmpty()) {
+            channelConfigsByShortcut.put(config.shortcut, config);
+        }
+        isInitialized = true;
+    }
+
     public static void loadConfiguredChannels() {
         channelConfigsByName.clear();
         channelConfigsByShortcut.clear();
