@@ -1,0 +1,142 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'idea'
+    id 'net.neoforged.moddev' version '2.0.88'
+}
+
+version = mod_version
+group = mod_group_id
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+base {
+    archivesName = "${mod_id}-${minecraft_version}-NeoForge"
+}
+
+java.toolchain.languageVersion = JavaLanguageVersion.of(21)
+
+neoForge {
+    version = project.neo_version
+
+    parchment {
+        mappingsVersion = project.parchment_mappings_version
+        minecraftVersion = project.parchment_minecraft_version
+    }
+
+    runs {
+        client {
+            client()
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        server {
+            server()
+            programArgument '--nogui'
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        gameTestServer {
+            type = "gameTestServer"
+            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
+        }
+
+        data {
+            data()
+            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
+        }
+
+        configureEach {
+            systemProperty 'forge.logging.markers', 'REGISTRIES'
+            logLevel = org.slf4j.event.Level.DEBUG
+        }
+    }
+
+    mods {
+        "${mod_id}" {
+            sourceSet(sourceSets.main)
+        }
+    }
+}
+
+sourceSets.main.resources { srcDir 'src/generated/resources' }
+
+configurations.all {
+    resolutionStrategy {
+        force 'org.slf4j:slf4j-api:2.0.7'
+    }
+}
+
+dependencies {
+    // Core shared logic (resolved via composite build, bundled via JarJar)
+    implementation 'world.landfall:verbatim-core'
+    jarJar(project.dependencies.create('world.landfall:verbatim-core'))
+
+    compileOnly 'net.luckperms:api:5.4'
+
+    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
+
+    // Explicit SLF4J dependency
+    implementation 'org.slf4j:slf4j-api:2.0.7'
+
+    // JDA dependency - transitive dependencies will be resolved automatically for compilation
+    implementation 'net.dv8tion:JDA:5.0.0-beta.24'
+
+    // Configure JarJar to bundle and relocate JDA and its necessary runtime dependencies
+    jarJar('net.dv8tion:JDA:5.0.0-beta.24') {
+        exclude group: 'org.slf4j'
+    }
+    jarJar('com.squareup.okhttp3:okhttp:4.12.0')
+    jarJar('com.squareup.okio:okio-jvm:3.2.0')
+    jarJar('org.jetbrains.kotlin:kotlin-stdlib:1.9.10')
+    jarJar('com.neovisionaries:nv-websocket-client:2.14')
+    jarJar('net.sf.trove4j:trove4j:3.0.3')
+    jarJar('com.fasterxml.jackson.core:jackson-core:2.15.2')
+    jarJar('com.fasterxml.jackson.core:jackson-databind:2.15.2')
+    jarJar('com.fasterxml.jackson.core:jackson-annotations:2.15.2')
+    jarJar('org.apache.commons:commons-collections4:4.4')
+}
+
+var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
+    var replaceProperties = [minecraft_version      : minecraft_version,
+                             minecraft_version_range: minecraft_version_range,
+                             neo_version            : neo_version,
+                             neo_version_range      : neo_version_range,
+                             loader_version_range   : loader_version_range,
+                             mod_id                 : mod_id,
+                             mod_name               : mod_name,
+                             mod_license            : mod_license,
+                             mod_version            : mod_version,
+                             mod_authors            : mod_authors,
+                             mod_description        : mod_description]
+    inputs.properties replaceProperties
+    expand replaceProperties
+    from "src/main/templates"
+    into "build/generated/sources/modMetadata"
+}
+
+sourceSets.main.resources.srcDir generateModMetadata
+neoForge.ideSyncTask generateModMetadata
+
+publishing {
+    publications {
+        register('mavenJava', MavenPublication) {
+            from components.java
+        }
+    }
+    repositories {
+        maven {
+            url "file://${project.projectDir}/repo"
+        }
+    }
+}
+
+idea {
+    module {
+        downloadSources = true
+        downloadJavadoc = true
+    }
+}

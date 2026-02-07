@@ -1,12 +1,8 @@
-pluginManagement {
-    repositories {
-        mavenLocal()
-        gradlePluginPortal()
-    }
-}
+rootProject.name = 'verbatim'
 
-plugins {
-    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
-}
-
-rootProject.name = 'Verbatim'
+// Link all modules for IDE discovery.
+// Each module builds independently with its own ./gradlew - this file
+// exists only so IntelliJ can find and index all modules in one window.
+includeBuild 'core'
+includeBuild 'hytale'
+includeBuild 'neoforge'
