@@ -242,7 +242,7 @@ public class ChatEventHandler {
 
                 ChatChannelManager.ChannelConfig finalTargetChannel = channelConfigOpt.get();
 
-                if (!finalTargetChannel.alwaysOn && finalTargetChannel.permission.isPresent() && !Verbatim.permissionService.hasPermission(sender, finalTargetChannel.permission.get(), 2)) {
+                if (!finalTargetChannel.alwaysOn && finalTargetChannel.permission.isPresent() && !Verbatim.permissionService.hasPermission(sender, finalTargetChannel.permission.get(), ChatChannelManager.CHANNEL_PERMISSION_LEVEL)) {
                     ChatChannelManager.autoLeaveChannel(sender, finalTargetChannel.name);
                     Verbatim.gameContext.sendMessage(sender, Verbatim.gameContext.createText("You no longer have permission to send messages in '")
                         .append(Verbatim.chatFormatter.parseColors(finalTargetChannel.displayPrefix + " " + finalTargetChannel.name))
@@ -279,7 +279,7 @@ public class ChatEventHandler {
 
                 for (GamePlayer recipient : Verbatim.gameContext.getAllOnlinePlayers()) {
                     if (ChatChannelManager.isJoined(recipient, finalTargetChannel.name)) {
-                        if (finalTargetChannel.alwaysOn || !finalTargetChannel.permission.isPresent() || Verbatim.permissionService.hasPermission(recipient, finalTargetChannel.permission.get(), 2)) {
+                        if (finalTargetChannel.alwaysOn || !finalTargetChannel.permission.isPresent() || Verbatim.permissionService.hasPermission(recipient, finalTargetChannel.permission.get(), ChatChannelManager.CHANNEL_PERMISSION_LEVEL)) {
                             if (effectiveRange >= 0) {
                                 double distSqr = Verbatim.gameContext.getDistanceSquared(recipient, sender);
                                 if (recipient.equals(sender)) {
@@ -318,7 +318,7 @@ public class ChatEventHandler {
                 Set<String> currentJoined = ChatChannelManager.getJoinedChannels(player);
                 for (String joinedChannelName : new HashSet<>(currentJoined)) {
                     ChatChannelManager.getChannelConfigByName(joinedChannelName).ifPresent(config -> {
-                        if (!config.alwaysOn && config.permission.isPresent() && !Verbatim.permissionService.hasPermission(player, config.permission.get(), 2)) {
+                        if (!config.alwaysOn && config.permission.isPresent() && !Verbatim.permissionService.hasPermission(player, config.permission.get(), ChatChannelManager.CHANNEL_PERMISSION_LEVEL)) {
                             ChatChannelManager.autoLeaveChannel(player, config.name);
                         }
                     });

@@ -93,7 +93,7 @@ public class PermissionService {
                             Method asBooleanMethod = permissionResult.getClass().getMethod("asBoolean");
                             boolean checkResult = (Boolean) asBooleanMethod.invoke(permissionResult);
 
-                            Verbatim.LOGGER.info("[Verbatim PermissionService] After loading user '{}', permission check for node '{}': {}",
+                            Verbatim.LOGGER.debug("[Verbatim PermissionService] After loading user '{}', permission check for node '{}': {}",
                                                player.getUsername(), permissionNode, checkResult);
                             return checkResult;
                         } else {
@@ -128,7 +128,7 @@ public class PermissionService {
         }
 
         boolean opCheckResult = Verbatim.gameContext.hasPermissionLevel(player, opLevelIfLuckPermsAbsent);
-        Verbatim.LOGGER.info("[Verbatim PermissionService] Vanilla OP check for player '{}', level {}: {} (for permission '{}')",
+        Verbatim.LOGGER.debug("[Verbatim PermissionService] Vanilla OP check for player '{}', level {}: {} (for permission '{}')",
                             player.getUsername(), opLevelIfLuckPermsAbsent, opCheckResult, permissionNode);
         return opCheckResult;
     }

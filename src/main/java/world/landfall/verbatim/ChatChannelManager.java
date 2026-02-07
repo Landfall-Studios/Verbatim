@@ -1,14 +1,15 @@
 package world.landfall.verbatim;
 
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
-import java.util.List;
 import java.util.Set;
-import java.util.HashSet;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-import java.util.ArrayList;
 import world.landfall.verbatim.chat.FocusTarget;
 import world.landfall.verbatim.chat.ChatFocus;
 import world.landfall.verbatim.context.GameColor;
@@ -16,11 +17,19 @@ import world.landfall.verbatim.context.GamePlayer;
 import static world.landfall.verbatim.context.GameText.*;
 
 public class ChatChannelManager {
-    private static boolean isInitialized = false;
+    private static volatile boolean isInitialized = false;
 
-    private static final Map<UUID, FocusTarget> playerFocus = new HashMap<>();
-    private static final Map<UUID, Set<String>> joinedChannels = new HashMap<>();
-    private static final Map<UUID, UUID> lastIncomingDmSender = new HashMap<>();
+    // Data storage keys
+    private static final String DATA_JOINED_CHANNELS = "verbatim:joined_channels";
+    private static final String DATA_FOCUSED_CHANNEL = "verbatim:focused_channel";
+
+    // Permission level required for channel access (operator level 2)
+    static final int CHANNEL_PERMISSION_LEVEL = 2;
+
+    // Thread-safe collections for concurrent access
+    private static final Map<UUID, FocusTarget> playerFocus = new ConcurrentHashMap<>();
+    private static final Map<UUID, Set<String>> joinedChannels = new ConcurrentHashMap<>();
+    private static final Map<UUID, UUID> lastIncomingDmSender = new ConcurrentHashMap<>();
 
     public static class ChannelConfig {
         public final String name;
@@ -56,8 +65,8 @@ public class ChatChannelManager {
         }
     }
 
-    private static final Map<String, ChannelConfig> channelConfigsByName = new HashMap<>();
-    private static final Map<String, ChannelConfig> channelConfigsByShortcut = new HashMap<>();
+    private static final Map<String, ChannelConfig> channelConfigsByName = new ConcurrentHashMap<>();
+    private static final Map<String, ChannelConfig> channelConfigsByShortcut = new ConcurrentHashMap<>();
 
     /**
      * Resets all state. Used for unit testing.
@@ -152,11 +161,18 @@ public class ChatChannelManager {
         ChannelConfig defaultConfig = channelConfigsByName.get(defaultChannelName);
         if (defaultConfig == null) {
             Verbatim.LOGGER.warn("[ChatChannelManager] Default channel named '{}' not found. Falling back.", defaultChannelName);
-            if (!channelConfigsByName.isEmpty()) {
-                defaultConfig = channelConfigsByName.values().stream().filter(c -> c.alwaysOn).findFirst()
-                                .orElse(channelConfigsByName.values().iterator().next());
-                Verbatim.LOGGER.warn("[ChatChannelManager] Using first available (preferably alwaysOn) channel '{}' as fallback default.", defaultConfig.name);
-            } else {
+            Collection<ChannelConfig> allConfigs = channelConfigsByName.values();
+            if (!allConfigs.isEmpty()) {
+                // Prefer alwaysOn channel, otherwise use any available channel
+                defaultConfig = allConfigs.stream()
+                    .filter(c -> c.alwaysOn)
+                    .findFirst()
+                    .orElseGet(() -> allConfigs.stream().findFirst().orElse(null));
+                if (defaultConfig != null) {
+                    Verbatim.LOGGER.warn("[ChatChannelManager] Using '{}' as fallback default channel.", defaultConfig.name);
+                }
+            }
+            if (defaultConfig == null) {
                 Verbatim.LOGGER.error("[ChatChannelManager] CRITICAL: No channels loaded. Cannot determine a default channel.");
                 return null;
             }
@@ -173,16 +189,16 @@ public class ChatChannelManager {
         Set<String> loadedJoinedChannels = new HashSet<>();
         String loadedFocusedChannel = null;
         try {
-            if (Verbatim.gameContext.hasPlayerData(player, "verbatim:joined_channels")) {
-                String[] joined = Verbatim.gameContext.getPlayerStringData(player, "verbatim:joined_channels").split(",");
+            if (Verbatim.gameContext.hasPlayerData(player, DATA_JOINED_CHANNELS)) {
+                String[] joined = Verbatim.gameContext.getPlayerStringData(player, DATA_JOINED_CHANNELS).split(",");
                 for (String chName : joined) {
                     if (!chName.isEmpty() && channelConfigsByName.containsKey(chName)) {
                         loadedJoinedChannels.add(chName);
                     }
                 }
             }
-            if (Verbatim.gameContext.hasPlayerData(player, "verbatim:focused_channel")) {
-                loadedFocusedChannel = Verbatim.gameContext.getPlayerStringData(player, "verbatim:focused_channel");
+            if (Verbatim.gameContext.hasPlayerData(player, DATA_FOCUSED_CHANNEL)) {
+                loadedFocusedChannel = Verbatim.gameContext.getPlayerStringData(player, DATA_FOCUSED_CHANNEL);
                 if (!channelConfigsByName.containsKey(loadedFocusedChannel)) {
                     loadedFocusedChannel = null;
                 }
@@ -206,7 +222,7 @@ public class ChatChannelManager {
                         .append(text("/channel leave").withColor(GameColor.WHITE).withUnderlined(true)));
                 }
             } else if (loadedJoinedChannels.contains(config.name)) {
-                if (config.permission.isPresent() && !Verbatim.permissionService.hasPermission(player, config.permission.get(), 2)) {
+                if (config.permission.isPresent() && !Verbatim.permissionService.hasPermission(player, config.permission.get(), CHANNEL_PERMISSION_LEVEL)) {
                     Verbatim.LOGGER.info("[ChatChannelManager] Player {} lost permission for saved joined channel '{}' on login. Removing.", player.getUsername(), config.name);
                     internalLeaveChannel(player, config.name);
                 }
@@ -237,22 +253,22 @@ public class ChatChannelManager {
 
     private static void savePlayerChannelState(GamePlayer player) {
         Set<String> currentJoined = joinedChannels.getOrDefault(player.getUUID(), new HashSet<>());
-        Verbatim.gameContext.setPlayerStringData(player, "verbatim:joined_channels", String.join(",", currentJoined));
+        Verbatim.gameContext.setPlayerStringData(player, DATA_JOINED_CHANNELS, String.join(",", currentJoined));
         FocusTarget currentFocused = playerFocus.get(player.getUUID());
         if (currentFocused instanceof ChatFocus) {
             ChatFocus chatFocus = (ChatFocus) currentFocused;
             if (chatFocus.getType() == ChatFocus.FocusType.CHANNEL) {
                 String channelName = chatFocus.getChannelName();
                 if (channelName != null) {
-                    Verbatim.gameContext.setPlayerStringData(player, "verbatim:focused_channel", channelName);
+                    Verbatim.gameContext.setPlayerStringData(player, DATA_FOCUSED_CHANNEL, channelName);
                 } else {
-                    Verbatim.gameContext.removePlayerData(player, "verbatim:focused_channel");
+                    Verbatim.gameContext.removePlayerData(player, DATA_FOCUSED_CHANNEL);
                 }
             } else {
-                Verbatim.gameContext.removePlayerData(player, "verbatim:focused_channel");
+                Verbatim.gameContext.removePlayerData(player, DATA_FOCUSED_CHANNEL);
             }
         } else {
-            Verbatim.gameContext.removePlayerData(player, "verbatim:focused_channel");
+            Verbatim.gameContext.removePlayerData(player, DATA_FOCUSED_CHANNEL);
         }
     }
 
@@ -284,7 +300,7 @@ public class ChatChannelManager {
         ChannelConfig config = channelConfigsByName.get(channelName);
         if (config == null) return false;
 
-        if (!forceJoin && config.permission.isPresent() && !Verbatim.permissionService.hasPermission(player, config.permission.get(), 2)) {
+        if (!forceJoin && config.permission.isPresent() && !Verbatim.permissionService.hasPermission(player, config.permission.get(), CHANNEL_PERMISSION_LEVEL)) {
             return false;
         }
         joinedChannels.computeIfAbsent(player.getUUID(), k -> new HashSet<>()).add(channelName);
@@ -304,7 +320,7 @@ public class ChatChannelManager {
             return true;
         }
 
-        if (config.alwaysOn || !config.permission.isPresent() || Verbatim.permissionService.hasPermission(player, config.permission.get(), 2)) {
+        if (config.alwaysOn || !config.permission.isPresent() || Verbatim.permissionService.hasPermission(player, config.permission.get(), CHANNEL_PERMISSION_LEVEL)) {
             internalJoinChannel(player, channelName, config.alwaysOn);
             Verbatim.gameContext.sendMessage(player, text("Joined channel: ").withColor(GameColor.GREEN)
                 .append(Verbatim.chatFormatter.parseColors(config.displayPrefix + " " + config.name)));
@@ -390,7 +406,7 @@ public class ChatChannelManager {
             return;
         }
 
-        if (config.alwaysOn || !config.permission.isPresent() || Verbatim.permissionService.hasPermission(player, config.permission.get(), 2)) {
+        if (config.alwaysOn || !config.permission.isPresent() || Verbatim.permissionService.hasPermission(player, config.permission.get(), CHANNEL_PERMISSION_LEVEL)) {
             boolean wasJoined = isJoined(player, channelName);
             internalJoinChannel(player, channelName, config.alwaysOn);
             playerFocus.put(player.getUUID(), ChatFocus.createChannelFocus(channelName));
