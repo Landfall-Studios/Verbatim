@@ -35,7 +35,10 @@ public class HytaleChatEvents {
     public static void onPlayerDisconnect(PlayerDisconnectEvent event) {
         PlayerRef playerRef = event.getPlayerRef();
         if (playerRef != null) {
-            ChatEventHandler.onPlayerLogout(new HytaleGamePlayer(playerRef));
+            HytaleGamePlayer gamePlayer = new HytaleGamePlayer(playerRef);
+            world.landfall.verbatim.Verbatim.LOGGER.debug("[Verbatim] Player disconnect event for: {} ({})",
+                gamePlayer.getUsername(), gamePlayer.getUUID());
+            ChatEventHandler.onPlayerLogout(gamePlayer);
         }
     }
 

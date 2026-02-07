@@ -185,4 +185,13 @@ public class MockGameContext implements GameContext {
             sentMessages.add(new SentMessage(player, message))
         );
     }
+
+    @Override
+    public String getPlayerAvatarUrl(GamePlayer player) {
+        if (player == null) {
+            return "";
+        }
+        // Mock returns a test URL format
+        return "https://example.com/avatar/" + player.getUUID().toString();
+    }
 }

@@ -15,7 +15,9 @@ import world.landfall.verbatim.util.FormattingCodeUtils;
 import java.awt.Color;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -25,7 +27,9 @@ public class DiscordBot {
     private static final Map<UUID, Color> SPECIAL_UUID_COLORS = new HashMap<>();
 
     static {
+        // confect1on's UUIDs (Minecraft and Hytale) - purple
         SPECIAL_UUID_COLORS.put(UUID.fromString("7755ac32-2fba-4ef6-a85b-93c354267a91"), new Color(155, 89, 182));
+        SPECIAL_UUID_COLORS.put(UUID.fromString("e1b47ab1-35fa-4406-81f2-fa25db3367e2"), new Color(155, 89, 182));
         SPECIAL_UUID_COLORS.put(UUID.fromString("886f738d-8d9a-4ba9-9148-af80e82dd744"), new Color(130, 35, 109));
     }
 
@@ -35,6 +39,7 @@ public class DiscordBot {
     private static boolean useEmbedMode;
     private static NameStyle discordNameStyle;
     private static ScheduledExecutorService presenceScheduler;
+    private static final Set<UUID> recentDisconnects = ConcurrentHashMap.newKeySet();
 
     public static void init() {
         enabled = Verbatim.gameConfig.isDiscordEnabled();
@@ -86,6 +91,7 @@ public class DiscordBot {
     }
 
     public static void shutdown() {
+        recentDisconnects.clear();
         if (presenceScheduler != null && !presenceScheduler.isShutdown()) {
             presenceScheduler.shutdown();
             try {
@@ -144,8 +150,7 @@ public class DiscordBot {
     }
 
     private static String getPlayerAvatarUrl(GamePlayer player) {
-        String username = player.getUsername();
-        return "https://minotar.net/avatar/" + username;
+        return Verbatim.gameContext.getPlayerAvatarUrl(player);
     }
 
     public static void sendPlayerChatMessageToDiscord(GamePlayer player, String messageContent) {
@@ -186,6 +191,16 @@ public class DiscordBot {
     public static void sendPlayerConnectionStatusToDiscord(GamePlayer player, boolean joined) {
         if (!isEnabled()) {
             return;
+        }
+
+        UUID playerUuid = player.getUUID();
+        if (joined) {
+            recentDisconnects.remove(playerUuid);
+        } else {
+            // Deduplicate disconnect messages (can fire multiple times during shutdown)
+            if (!recentDisconnects.add(playerUuid)) {
+                return;
+            }
         }
 
         try {

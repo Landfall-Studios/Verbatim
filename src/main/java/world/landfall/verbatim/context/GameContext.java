@@ -127,4 +127,13 @@ public interface GameContext {
      * Sends a failure message in response to a command.
      */
     void sendCommandFailure(GameCommandSource source, GameComponent message);
+
+    // === Discord Integration ===
+
+    /**
+     * Gets the avatar URL for a player for use in Discord embeds.
+     * Minecraft: Uses minotar.net with username
+     * Hytale: Uses crafthead.net/hytale with UUID
+     */
+    String getPlayerAvatarUrl(GamePlayer player);
 }

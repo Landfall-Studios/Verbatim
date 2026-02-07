@@ -1,76 +1,49 @@
 package world.landfall.verbatim.platform.hytale;
 
+import com.hypixel.hytale.server.core.permissions.PermissionsModule;
 import world.landfall.verbatim.Verbatim;
 import world.landfall.verbatim.context.GamePlayer;
 import world.landfall.verbatim.util.PermissionService;
 
-import java.lang.reflect.Method;
 import java.util.UUID;
 
 /**
- * Hytale-specific permission service using PermissionsPlus.
- * Falls back to permission level checks if PermissionsPlus is not available.
+ * Hytale-specific permission service using Hytale's native PermissionsModule.
+ *
+ * Uses PermissionsModule.get().hasPermission(UUID, String) for permission checks.
  */
 public class HytalePermissionService extends PermissionService {
 
-    private Object permissionsPlusApi;
-    private Boolean permissionsPlusAvailable;
-
     public HytalePermissionService() {
-        this.permissionsPlusApi = null;
-        this.permissionsPlusAvailable = null;
-        Verbatim.LOGGER.info("[HytalePermissionService] Initialized. PermissionsPlus availability will be checked on first use.");
-    }
-
-    private void ensurePermissionsPlusChecked() {
-        if (this.permissionsPlusAvailable == null) {
-            try {
-                // Try to load PermissionsPlus API via reflection
-                Class<?> permissionsPlusClass = Class.forName("com.hypixel.hytale.permissionsplus.PermissionsPlus");
-                Method getInstanceMethod = permissionsPlusClass.getMethod("getInstance");
-                this.permissionsPlusApi = getInstanceMethod.invoke(null);
-                this.permissionsPlusAvailable = true;
-                Verbatim.LOGGER.info("[HytalePermissionService] PermissionsPlus API found and loaded.");
-            } catch (ClassNotFoundException e) {
-                this.permissionsPlusApi = null;
-                this.permissionsPlusAvailable = false;
-                Verbatim.LOGGER.warn("[HytalePermissionService] PermissionsPlus not found. Using fallback permission checks.");
-            } catch (Exception e) {
-                this.permissionsPlusApi = null;
-                this.permissionsPlusAvailable = false;
-                Verbatim.LOGGER.warn("[HytalePermissionService] PermissionsPlus unavailable: {}. Using fallback.", e.getMessage());
-            }
-        }
+        Verbatim.LOGGER.info("[HytalePermissionService] Initialized. Using Hytale PermissionsModule.");
     }
 
     @Override
     public boolean isPermissionSystemAvailable() {
-        ensurePermissionsPlusChecked();
-        return this.permissionsPlusAvailable;
+        try {
+            return PermissionsModule.get() != null;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     @Override
     protected boolean checkPermission(GamePlayer player, String permissionNode, int fallbackPermissionLevel) {
-        ensurePermissionsPlusChecked();
+        UUID playerUuid = player.getUUID();
 
-        if (this.permissionsPlusAvailable && this.permissionsPlusApi != null) {
-            try {
-                // PermissionsPlus API: hasPermission(UUID playerUuid, String permission)
-                Method hasPermissionMethod = this.permissionsPlusApi.getClass()
-                    .getMethod("hasPermission", UUID.class, String.class);
-                Boolean result = (Boolean) hasPermissionMethod.invoke(
-                    this.permissionsPlusApi, player.getUUID(), permissionNode);
-
-                Verbatim.LOGGER.debug("[HytalePermissionService] PermissionsPlus check for '{}', node '{}': {}",
+        try {
+            PermissionsModule permissions = PermissionsModule.get();
+            if (permissions != null) {
+                boolean result = permissions.hasPermission(playerUuid, permissionNode);
+                Verbatim.LOGGER.debug("[HytalePermissionService] Check '{}' for '{}': {}",
                     player.getUsername(), permissionNode, result);
-                return result != null && result;
-
-            } catch (Exception e) {
-                Verbatim.LOGGER.warn("[HytalePermissionService] PermissionsPlus check failed for '{}': {}. Using fallback.",
-                    player.getUsername(), e.getMessage());
+                return result;
             }
+        } catch (Exception e) {
+            Verbatim.LOGGER.warn("[HytalePermissionService] Permission check failed: {}", e.getMessage());
         }
 
+        Verbatim.LOGGER.debug("[HytalePermissionService] Falling back to permission level for '{}'", permissionNode);
         return fallbackPermissionCheck(player, fallbackPermissionLevel);
     }
 }

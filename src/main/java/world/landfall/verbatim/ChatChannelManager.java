@@ -188,20 +188,29 @@ public class ChatChannelManager {
     private static void loadPlayerChannelState(GamePlayer player) {
         Set<String> loadedJoinedChannels = new HashSet<>();
         String loadedFocusedChannel = null;
+        Verbatim.LOGGER.info("[ChatChannelManager] loadPlayerChannelState for {} ({})", player.getUsername(), player.getUUID());
         try {
             if (Verbatim.gameContext.hasPlayerData(player, DATA_JOINED_CHANNELS)) {
-                String[] joined = Verbatim.gameContext.getPlayerStringData(player, DATA_JOINED_CHANNELS).split(",");
+                String rawJoined = Verbatim.gameContext.getPlayerStringData(player, DATA_JOINED_CHANNELS);
+                Verbatim.LOGGER.info("[ChatChannelManager] Found persisted joined channels for {}: {}", player.getUsername(), rawJoined);
+                String[] joined = rawJoined.split(",");
                 for (String chName : joined) {
                     if (!chName.isEmpty() && channelConfigsByName.containsKey(chName)) {
                         loadedJoinedChannels.add(chName);
                     }
                 }
+            } else {
+                Verbatim.LOGGER.info("[ChatChannelManager] No persisted joined channels for {}", player.getUsername());
             }
             if (Verbatim.gameContext.hasPlayerData(player, DATA_FOCUSED_CHANNEL)) {
                 loadedFocusedChannel = Verbatim.gameContext.getPlayerStringData(player, DATA_FOCUSED_CHANNEL);
+                Verbatim.LOGGER.info("[ChatChannelManager] Found persisted focused channel for {}: {}", player.getUsername(), loadedFocusedChannel);
                 if (!channelConfigsByName.containsKey(loadedFocusedChannel)) {
+                    Verbatim.LOGGER.warn("[ChatChannelManager] Persisted focused channel {} no longer exists", loadedFocusedChannel);
                     loadedFocusedChannel = null;
                 }
+            } else {
+                Verbatim.LOGGER.info("[ChatChannelManager] No persisted focused channel for {}", player.getUsername());
             }
         } catch (Exception e) {
             Verbatim.LOGGER.error("[ChatChannelManager] Error loading player channel state for {}: {}", player.getUsername(), e.getMessage());
@@ -253,13 +262,16 @@ public class ChatChannelManager {
 
     private static void savePlayerChannelState(GamePlayer player) {
         Set<String> currentJoined = joinedChannels.getOrDefault(player.getUUID(), new HashSet<>());
-        Verbatim.gameContext.setPlayerStringData(player, DATA_JOINED_CHANNELS, String.join(",", currentJoined));
+        String joinedStr = String.join(",", currentJoined);
+        Verbatim.LOGGER.debug("[ChatChannelManager] savePlayerChannelState for {}: joined={}", player.getUsername(), joinedStr);
+        Verbatim.gameContext.setPlayerStringData(player, DATA_JOINED_CHANNELS, joinedStr);
         FocusTarget currentFocused = playerFocus.get(player.getUUID());
         if (currentFocused instanceof ChatFocus) {
             ChatFocus chatFocus = (ChatFocus) currentFocused;
             if (chatFocus.getType() == ChatFocus.FocusType.CHANNEL) {
                 String channelName = chatFocus.getChannelName();
                 if (channelName != null) {
+                    Verbatim.LOGGER.debug("[ChatChannelManager] savePlayerChannelState for {}: focused={}", player.getUsername(), channelName);
                     Verbatim.gameContext.setPlayerStringData(player, DATA_FOCUSED_CHANNEL, channelName);
                 } else {
                     Verbatim.gameContext.removePlayerData(player, DATA_FOCUSED_CHANNEL);
@@ -429,6 +441,16 @@ public class ChatChannelManager {
     }
 
     public static void playerLoggedOut(GamePlayer player) {
+        // Check if already logged out (prevents double-save during shutdown)
+        if (!joinedChannels.containsKey(player.getUUID()) && !playerFocus.containsKey(player.getUUID())) {
+            Verbatim.LOGGER.debug("[ChatChannelManager] playerLoggedOut skipped for {} - already processed", player.getUsername());
+            return;
+        }
+
+        Verbatim.LOGGER.info("[ChatChannelManager] playerLoggedOut for {} ({})", player.getUsername(), player.getUUID());
+        Verbatim.LOGGER.debug("[ChatChannelManager] Saving state before logout: joined={}, focus={}",
+            joinedChannels.getOrDefault(player.getUUID(), new HashSet<>()),
+            playerFocus.get(player.getUUID()));
         savePlayerChannelState(player);
         playerFocus.remove(player.getUUID());
         joinedChannels.remove(player.getUUID());

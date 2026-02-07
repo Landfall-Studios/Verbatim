@@ -12,7 +12,6 @@ base {
 
 java {
     toolchain.languageVersion = JavaLanguageVersion.of(java_version)
-    withSourcesJar()
 }
 
 repositories {
@@ -64,8 +63,12 @@ tasks {
         }
     }
 
+    jar {
+        enabled = false
+    }
+
     shadowJar {
-        archiveBaseName.set(rootProject.name)
+        archiveBaseName.set("${mod_id}-Hytale")
         archiveClassifier.set('')
 
         // Relocate bundled dependencies to avoid classpath conflicts

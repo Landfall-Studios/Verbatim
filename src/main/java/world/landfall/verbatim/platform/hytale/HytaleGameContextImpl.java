@@ -184,7 +184,10 @@ public class HytaleGameContextImpl implements GameContext {
         if (player == null || key == null) {
             return false;
         }
-        return persistentData.containsKey(dataKey(player, key));
+        String fullKey = dataKey(player, key);
+        boolean has = persistentData.containsKey(fullKey);
+        world.landfall.verbatim.Verbatim.LOGGER.debug("[Verbatim] hasPlayerData: {} = {}", fullKey, has);
+        return has;
     }
 
     @Override
@@ -192,7 +195,10 @@ public class HytaleGameContextImpl implements GameContext {
         if (player == null || key == null) {
             return "";
         }
-        return persistentData.getOrDefault(dataKey(player, key), "");
+        String fullKey = dataKey(player, key);
+        String value = persistentData.getOrDefault(fullKey, "");
+        world.landfall.verbatim.Verbatim.LOGGER.debug("[Verbatim] getPlayerStringData: {} = {}", fullKey, value);
+        return value;
     }
 
     @Override
@@ -200,7 +206,9 @@ public class HytaleGameContextImpl implements GameContext {
         if (player == null || key == null || value == null) {
             return;
         }
-        persistentData.put(dataKey(player, key), value);
+        String fullKey = dataKey(player, key);
+        persistentData.put(fullKey, value);
+        world.landfall.verbatim.Verbatim.LOGGER.debug("[Verbatim] setPlayerStringData: {} = {}", fullKey, value);
     }
 
     @Override
@@ -294,5 +302,16 @@ public class HytaleGameContextImpl implements GameContext {
         Message errorMsg = ((HytaleGameComponentImpl) message).toHytale()
             .color(java.awt.Color.RED);
         hSource.getHandle().sendMessage(errorMsg);
+    }
+
+    // === Discord Integration ===
+
+    @Override
+    public String getPlayerAvatarUrl(GamePlayer player) {
+        if (player == null) {
+            return "";
+        }
+        // Hytale uses crafthead.net with UUID for avatars
+        return "https://crafthead.net/hytale/avatar/" + player.getUUID().toString();
     }
 }

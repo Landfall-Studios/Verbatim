@@ -7,6 +7,7 @@ import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.arguments.system.OptionalArg;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
@@ -25,18 +26,37 @@ import static world.landfall.verbatim.context.GameText.*;
 
 /**
  * Hytale-specific command registration.
- * Each command extends AbstractPlayerCommand and delegates to VerbatimCommandHandlers.
- *
  * Commands are registered in HytaleEntryPoint's setup() method via
  * this.getCommandRegistry().registerCommand(...).
  */
 public class HytaleCommandRegistrar {
 
-    // === Channel Commands ===
+    // === /channel command collection ===
 
-    public static class ChannelsCommand extends AbstractPlayerCommand {
-        public ChannelsCommand() {
-            super("channels", "Lists all available chat channels");
+    public static class ChannelCommand extends AbstractCommandCollection {
+        public ChannelCommand() {
+            super("channel", "Channel management commands");
+            addSubCommand(new ChannelListSubCommand());
+            addSubCommand(new ChannelHelpSubCommand());
+            addSubCommand(new ChannelJoinSubCommand());
+            addSubCommand(new ChannelLeaveSubCommand());
+            addSubCommand(new ChannelFocusSubCommand());
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false; // Available to all players
+        }
+    }
+
+    public static class ChannelListSubCommand extends AbstractPlayerCommand {
+        public ChannelListSubCommand() {
+            super("list", "Lists all available chat channels");
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
         }
 
         @Override
@@ -46,9 +66,14 @@ public class HytaleCommandRegistrar {
         }
     }
 
-    public static class ChannelHelpCommand extends AbstractPlayerCommand {
-        public ChannelHelpCommand() {
-            super("channelhelp", "Shows Verbatim channel help");
+    public static class ChannelHelpSubCommand extends AbstractPlayerCommand {
+        public ChannelHelpSubCommand() {
+            super("help", "Shows Verbatim channel help");
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
         }
 
         @Override
@@ -58,28 +83,17 @@ public class HytaleCommandRegistrar {
         }
     }
 
-    public static class ChannelFocusCommand extends AbstractPlayerCommand {
+    public static class ChannelJoinSubCommand extends AbstractPlayerCommand {
         private final RequiredArg<String> channelNameArg;
 
-        public ChannelFocusCommand() {
-            super("channelfocus", "Focus on a specific chat channel");
+        public ChannelJoinSubCommand() {
+            super("join", "Join a chat channel");
             channelNameArg = withRequiredArg("channelName", "The channel name", ArgTypes.STRING);
         }
 
         @Override
-        protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
-                @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
-            String channelName = ctx.get(channelNameArg);
-            ChatChannelManager.focusChannel(new HytaleGamePlayer(playerRef), channelName);
-        }
-    }
-
-    public static class ChannelJoinCommand extends AbstractPlayerCommand {
-        private final RequiredArg<String> channelNameArg;
-
-        public ChannelJoinCommand() {
-            super("channeljoin", "Join a chat channel");
-            channelNameArg = withRequiredArg("channelName", "The channel name", ArgTypes.STRING);
+        protected boolean canGeneratePermission() {
+            return false;
         }
 
         @Override
@@ -90,12 +104,17 @@ public class HytaleCommandRegistrar {
         }
     }
 
-    public static class ChannelLeaveCommand extends AbstractPlayerCommand {
+    public static class ChannelLeaveSubCommand extends AbstractPlayerCommand {
         private final OptionalArg<String> channelNameArg;
 
-        public ChannelLeaveCommand() {
-            super("channelleave", "Leave a chat channel");
+        public ChannelLeaveSubCommand() {
+            super("leave", "Leave a chat channel");
             channelNameArg = withOptionalArg("channelName", "The channel name", ArgTypes.STRING);
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
         }
 
         @Override
@@ -113,6 +132,46 @@ public class HytaleCommandRegistrar {
         }
     }
 
+    public static class ChannelFocusSubCommand extends AbstractPlayerCommand {
+        private final RequiredArg<String> channelNameArg;
+
+        public ChannelFocusSubCommand() {
+            super("focus", "Focus on a specific chat channel");
+            channelNameArg = withRequiredArg("channelName", "The channel name", ArgTypes.STRING);
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
+        protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
+                @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+            String channelName = ctx.get(channelNameArg);
+            ChatChannelManager.focusChannel(new HytaleGamePlayer(playerRef), channelName);
+        }
+    }
+
+    // === Standalone /channels command (alias for /channel list) ===
+
+    public static class ChannelsCommand extends AbstractPlayerCommand {
+        public ChannelsCommand() {
+            super("channels", "Lists all available chat channels");
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
+        protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
+                @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+            VerbatimCommandHandlers.listChannels(wrapSource(ctx, playerRef));
+        }
+    }
+
     // === Direct Message Commands ===
 
     public static class MsgCommand extends AbstractPlayerCommand {
@@ -124,6 +183,11 @@ public class HytaleCommandRegistrar {
             targetArg = withRequiredArg("player", "The player to message", ArgTypes.PLAYER_REF);
             messageArg = withOptionalArg("message", "The message to send", ArgTypes.STRING);
             setAllowsExtraArguments(true);
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
         }
 
         @Override
@@ -154,6 +218,11 @@ public class HytaleCommandRegistrar {
         }
 
         @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
         protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
                 @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
             HytaleGamePlayer sender = new HytaleGamePlayer(playerRef);
@@ -175,6 +244,11 @@ public class HytaleCommandRegistrar {
         }
 
         @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
         protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
                 @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
             VerbatimCommandHandlers.executeCustomListCommand(wrapSource(ctx, playerRef));
@@ -184,6 +258,11 @@ public class HytaleCommandRegistrar {
     public static class VListCommand extends AbstractPlayerCommand {
         public VListCommand() {
             super("vlist", "Lists online players (Verbatim format)");
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
         }
 
         @Override
@@ -201,6 +280,11 @@ public class HytaleCommandRegistrar {
         public ChListCommand() {
             super("chlist", "Admin: list channels for a player or players in a channel");
             targetArg = withRequiredArg("target", "A player name or channel name", ArgTypes.STRING);
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
         }
 
         @Override
@@ -226,6 +310,11 @@ public class HytaleCommandRegistrar {
             super("chkick", "Admin: kick a player from a channel");
             playerArg = withRequiredArg("player", "The player to kick", ArgTypes.PLAYER_REF);
             channelArg = withRequiredArg("channel", "The channel to kick from", ArgTypes.STRING);
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
         }
 
         @Override
@@ -256,6 +345,11 @@ public class HytaleCommandRegistrar {
             super("nick", "Set, show, or clear your nickname");
             nicknameArg = withOptionalArg("nickname", "The nickname to set, or 'clear' to remove", ArgTypes.STRING);
             setAllowsExtraArguments(true);
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
         }
 
         @Override

@@ -15,7 +15,9 @@ import world.landfall.verbatim.util.PrefixService;
  */
 public final class Verbatim {
     public static final String MODID = "verbatim";
-    public static final Logger LOGGER = LoggerFactory.getLogger("Verbatim");
+
+    // Logger is set by the platform entry point. Defaults to SLF4J for NeoForge.
+    public static Logger LOGGER = LoggerFactory.getLogger("Verbatim");
 
     public static GameContext gameContext;
     public static GameConfig gameConfig;

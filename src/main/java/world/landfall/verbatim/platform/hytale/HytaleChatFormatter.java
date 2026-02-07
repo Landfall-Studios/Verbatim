@@ -253,18 +253,18 @@ public class HytaleChatFormatter implements ChatFormatter {
             }
         }
 
-        // Build the prefix from LuckPerms if available
-        String luckPermsPrefix = "";
-        if (Verbatim.prefixService != null && Verbatim.prefixService.isLuckPermsAvailable()) {
-            luckPermsPrefix = Verbatim.prefixService.getPlayerPrefix(player);
+        // Build the prefix from permission system if available
+        String playerPrefix = "";
+        if (Verbatim.prefixService != null && Verbatim.prefixService.isPrefixSystemAvailable()) {
+            playerPrefix = Verbatim.prefixService.getPlayerPrefix(player);
         }
 
         Message fullName = Message.raw("");
 
-        if (!luckPermsPrefix.isEmpty()) {
-            Message prefixMsg = ((HytaleGameComponentImpl) parseColors(luckPermsPrefix)).toHytale();
+        if (!playerPrefix.isEmpty()) {
+            Message prefixMsg = ((HytaleGameComponentImpl) parseColors(playerPrefix)).toHytale();
             fullName = Message.join(fullName, prefixMsg);
-            if (!luckPermsPrefix.endsWith(" ")) {
+            if (!playerPrefix.endsWith(" ")) {
                 fullName = Message.join(fullName, Message.raw(" "));
             }
         }
