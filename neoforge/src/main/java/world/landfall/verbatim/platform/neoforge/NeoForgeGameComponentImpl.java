@@ -78,6 +78,12 @@ public class NeoForgeGameComponentImpl implements GameComponent {
     }
 
     @Override
+    public GameComponent withRgbColor(int rgb) {
+        wrapped = wrapped.withStyle(Style.EMPTY.withColor(net.minecraft.network.chat.TextColor.fromRgb(rgb)));
+        return this;
+    }
+
+    @Override
     public GameComponent withBold(boolean bold) {
         wrapped = wrapped.withStyle(Style.EMPTY.withBold(bold));
         return this;

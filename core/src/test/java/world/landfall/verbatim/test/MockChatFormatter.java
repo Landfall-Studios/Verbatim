@@ -39,6 +39,11 @@ public class MockChatFormatter implements ChatFormatter {
     }
 
     @Override
+    public GameComponent createFavoriteNameComponent(GamePlayer player, String colorPrefix, boolean isDM, NameStyle nameStyle, int gradientStartRgb, int gradientEndRgb) {
+        return new MockGameComponent("[FAV]" + player.getDisplayName());
+    }
+
+    @Override
     public String createDiscordPlayerName(GamePlayer player, NameStyle nameStyle) {
         return player.getDisplayName();
     }

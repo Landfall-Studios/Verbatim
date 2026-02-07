@@ -38,9 +38,9 @@ All in `world.landfall.verbatim.context`:
 |-----------|---------|
 | `GameContext` | Server operations, player retrieval, messaging, persistent data, permissions, component creation |
 | `GamePlayer` | Player abstraction (username, display name, UUID, name components) |
-| `GameComponent` | Styled text with color, bold, italic, underline, click/hover events |
+| `GameComponent` | Styled text with color (named + arbitrary RGB), bold, italic, underline, click/hover events |
 | `GameCommandSource` | Command executor abstraction with permission checks |
-| `ChatFormatter` | Color code parsing, player name formatting, link detection |
+| `ChatFormatter` | Color code parsing (`&X` and `&#RRGGBB`), player name formatting (including favorite gradient), link detection |
 | `GameConfig` | Configuration access (channels, Discord settings, join/leave messages) |
 | `GameColor` | Enum of 16 standard colors with formatting codes and RGB values |
 | `GameText` | Static helper (`text("Hello").withColor(GameColor.GREEN)`) |
@@ -67,11 +67,11 @@ In `world.landfall.verbatim.specialchannels`:
 
 | Class | Purpose |
 |-------|---------|
-| `ChatEventHandler` | Processes login/logout/chat events, routes messages to channels/DMs, handles distance delivery |
+| `ChatEventHandler` | Processes login/logout/chat events, routes messages to channels/DMs, handles distance delivery, per-recipient favorite name rendering |
 | `ChatChannelManager` | Channel config loading, player membership tracking, focus management, persistent state |
 | `VerbatimCommandHandlers` | Platform-independent command implementations (`/channel`, `/msg`, `/nick`, etc.) |
 | `NicknameService` | Nickname storage, validation, and formatting code filtering |
-| `FormattingCodeUtils` | Utilities for stripping `&` formatting codes |
+| `FormattingCodeUtils` | Utilities for stripping `&` formatting codes (including `&#RRGGBB` hex codes) |
 | `DiscordBot` / `DiscordListener` | JDA-based Discord bridge |
 
 ## Platform Implementations

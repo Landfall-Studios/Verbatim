@@ -15,6 +15,6 @@ public final class FormattingCodeUtils {
         if (text == null) {
             return null;
         }
-        return text.replaceAll("(?i)[&\u00a7][0-9A-FK-OR]", "");
+        return text.replaceAll("(?i)[&§]#[0-9a-f]{6}|[&§][0-9A-FK-OR]", "");
     }
 }

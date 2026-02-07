@@ -22,6 +22,12 @@ public interface GameComponent {
     GameComponent withColor(GameColor color);
 
     /**
+     * Applies an arbitrary RGB color to this component.
+     * @param rgb the RGB color value (e.g. 0xFF0000 for red)
+     */
+    GameComponent withRgbColor(int rgb);
+
+    /**
      * Sets whether this component is bold.
      */
     GameComponent withBold(boolean bold);

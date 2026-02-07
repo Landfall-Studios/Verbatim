@@ -26,6 +26,12 @@ Verbatim is a server-side chat plugin providing configurable chat channels, dire
     *   Remembers joined channels and focused channel across sessions.
 *   **Nicknames:**
     *   Set custom nicknames with optional color code support (permission-gated).
+*   **Hex Color Codes:**
+    *   Use `&#RRGGBB` for arbitrary RGB colors in chat, nicknames, and channel configs (e.g., `&#FF0000Hello` for red text).
+    *   Gated behind the `verbatim.chat.color` permission for player input.
+*   **Favorites & Ignore:**
+    *   Favorite players so their name appears to you with a gold gradient in channel messages.
+    *   Ignore players to hide their messages from you.
 
 ## Commands
 
@@ -41,6 +47,15 @@ Verbatim is a server-side chat plugin providing configurable chat channels, dire
 
 *   `/msg <player> [message]` or `/tell <player> [message]` - Send a DM or focus DM with a player.
 *   `/r [message]` - Reply to or focus DM with the last player who messaged you.
+
+### Social Commands
+
+*   `/fav add <player>` - Add a player to your favorites. Their name will appear to you with a gold gradient in channel messages.
+*   `/fav remove <player>` - Remove a player from your favorites.
+*   `/fav list` - List your favorited players and their online status.
+*   `/ignore add <player>` - Ignore a player. Their channel messages and DMs are hidden.
+*   `/ignore remove <player>` - Stop ignoring a player.
+*   `/ignore list` - List your ignored players.
 
 ### Other Commands
 
@@ -97,7 +112,7 @@ Configuration is in `verbatim-config.json` in the plugin's data directory.
 Verbatim uses LuckPerms if available, falling back to native permission systems.
 
 *   **Channel Access:** Set via the `permission` field per channel (e.g., `verbatim.channel.staff`).
-*   **Chat Colors:** `verbatim.chat.color` - Allows `&` color codes in chat.
+*   **Chat Colors:** `verbatim.chat.color` - Allows `&` color codes and `&#RRGGBB` hex color codes in chat.
 *   **Chat Formatting:** `verbatim.chat.format` - Allows `&l` (bold), `&o` (italic) in chat.
 *   **Nicknames:** `verbatim.nick` - Allows `/nick` usage.
 *   **Admin:** `verbatim.admin` - Admin commands (`/chlist`, `/chkick`).
@@ -109,3 +124,41 @@ Verbatim uses LuckPerms if available, falling back to native permission systems.
 *   **Set a prefix tooltip:** `/lp user <username> meta set prefix_tooltip.0 "<text>"`
     *   Example: `/lp group admin meta set prefix_tooltip.0 "Server Administrator"`
     *   Supports `prefix_tooltip.0` through `prefix_tooltip.9` for multiple entries.
+
+## Color Codes
+
+### Standard Color Codes
+
+Use `&` followed by a code character:
+
+| Code | Color | Code | Color |
+|------|-------|------|-------|
+| `&0` | Black | `&8` | Dark Gray |
+| `&1` | Dark Blue | `&9` | Blue |
+| `&2` | Dark Green | `&a` | Green |
+| `&3` | Dark Aqua | `&b` | Aqua |
+| `&4` | Dark Red | `&c` | Red |
+| `&5` | Dark Purple | `&d` | Light Purple |
+| `&6` | Gold | `&e` | Yellow |
+| `&7` | Gray | `&f` | White |
+
+### Formatting Codes
+
+| Code | Effect |
+|------|--------|
+| `&l` | **Bold** |
+| `&o` | *Italic* |
+| `&n` | Underline (Minecraft only) |
+| `&m` | ~~Strikethrough~~ (Minecraft only) |
+| `&k` | Obfuscated (Minecraft only) |
+| `&r` | Reset all formatting |
+
+### Hex Color Codes
+
+Use `&#RRGGBB` for any RGB color:
+
+*   `&#FF0000Hello` - Red text
+*   `&#00FF00World` - Green text
+*   `&#7B68EEMagic` - Medium slate blue text
+
+Hex colors work anywhere standard color codes do: chat messages, nicknames, and channel config display prefixes. In player chat, hex colors require the `verbatim.chat.color` permission.

@@ -10,6 +10,7 @@ import world.landfall.verbatim.context.GameComponent;
 public class MockGameComponent implements GameComponent {
     private StringBuilder content = new StringBuilder();
     private GameColor color;
+    private int rgbColor = -1;
     private boolean bold;
     private boolean italic;
     private boolean underlined;
@@ -39,6 +40,12 @@ public class MockGameComponent implements GameComponent {
     @Override
     public GameComponent withColor(GameColor color) {
         this.color = color;
+        return this;
+    }
+
+    @Override
+    public GameComponent withRgbColor(int rgb) {
+        this.rgbColor = rgb;
         return this;
     }
 
@@ -109,6 +116,7 @@ public class MockGameComponent implements GameComponent {
     public GameComponent copy() {
         MockGameComponent copy = new MockGameComponent(content.toString());
         copy.color = this.color;
+        copy.rgbColor = this.rgbColor;
         copy.bold = this.bold;
         copy.italic = this.italic;
         copy.underlined = this.underlined;
@@ -122,6 +130,7 @@ public class MockGameComponent implements GameComponent {
 
     // Test helpers
     public GameColor getColor() { return color; }
+    public int getRgbColor() { return rgbColor; }
     public boolean isBold() { return bold; }
     public boolean isItalic() { return italic; }
     public boolean isUnderlined() { return underlined; }

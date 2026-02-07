@@ -371,6 +371,164 @@ public class HytaleCommandRegistrar {
         }
     }
 
+    // === Ignore Commands ===
+
+    public static class IgnoreCommand extends AbstractCommandCollection {
+        public IgnoreCommand() {
+            super("ignore", "Manage your ignore list");
+            addSubCommand(new IgnoreAddSubCommand());
+            addSubCommand(new IgnoreRemoveSubCommand());
+            addSubCommand(new IgnoreListSubCommand());
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+    }
+
+    public static class IgnoreAddSubCommand extends AbstractPlayerCommand {
+        private final RequiredArg<PlayerRef> targetArg;
+
+        public IgnoreAddSubCommand() {
+            super("add", "Add a player to your ignore list");
+            targetArg = withRequiredArg("player", "The player to ignore", ArgTypes.PLAYER_REF);
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
+        protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
+                @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+            HytaleGamePlayer player = new HytaleGamePlayer(playerRef);
+            PlayerRef targetRef = ctx.get(targetArg);
+            HytaleGamePlayer target = new HytaleGamePlayer(targetRef);
+            VerbatimCommandHandlers.executeIgnoreAdd(player, target);
+        }
+    }
+
+    public static class IgnoreRemoveSubCommand extends AbstractPlayerCommand {
+        private final RequiredArg<String> nameArg;
+
+        public IgnoreRemoveSubCommand() {
+            super("remove", "Remove a player from your ignore list");
+            nameArg = withRequiredArg("player", "The player name to unignore", ArgTypes.STRING);
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
+        protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
+                @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+            HytaleGamePlayer player = new HytaleGamePlayer(playerRef);
+            String targetName = ctx.get(nameArg);
+            VerbatimCommandHandlers.executeIgnoreRemove(player, targetName);
+        }
+    }
+
+    public static class IgnoreListSubCommand extends AbstractPlayerCommand {
+        public IgnoreListSubCommand() {
+            super("list", "Show your ignore list");
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
+        protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
+                @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+            HytaleGamePlayer player = new HytaleGamePlayer(playerRef);
+            VerbatimCommandHandlers.executeIgnoreList(player);
+        }
+    }
+
+    // === Favorite Commands ===
+
+    public static class FavCommand extends AbstractCommandCollection {
+        public FavCommand() {
+            super("fav", "Manage your favorites list");
+            addSubCommand(new FavAddSubCommand());
+            addSubCommand(new FavRemoveSubCommand());
+            addSubCommand(new FavListSubCommand());
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+    }
+
+    public static class FavAddSubCommand extends AbstractPlayerCommand {
+        private final RequiredArg<PlayerRef> targetArg;
+
+        public FavAddSubCommand() {
+            super("add", "Add a player to your favorites");
+            targetArg = withRequiredArg("player", "The player to favorite", ArgTypes.PLAYER_REF);
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
+        protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
+                @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+            HytaleGamePlayer player = new HytaleGamePlayer(playerRef);
+            PlayerRef targetRef = ctx.get(targetArg);
+            HytaleGamePlayer target = new HytaleGamePlayer(targetRef);
+            VerbatimCommandHandlers.executeFavAdd(player, target);
+        }
+    }
+
+    public static class FavRemoveSubCommand extends AbstractPlayerCommand {
+        private final RequiredArg<String> nameArg;
+
+        public FavRemoveSubCommand() {
+            super("remove", "Remove a player from your favorites");
+            nameArg = withRequiredArg("player", "The player name to unfavorite", ArgTypes.STRING);
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
+        protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
+                @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+            HytaleGamePlayer player = new HytaleGamePlayer(playerRef);
+            String targetName = ctx.get(nameArg);
+            VerbatimCommandHandlers.executeFavRemove(player, targetName);
+        }
+    }
+
+    public static class FavListSubCommand extends AbstractPlayerCommand {
+        public FavListSubCommand() {
+            super("list", "Show your favorites with online status");
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
+        protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
+                @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+            HytaleGamePlayer player = new HytaleGamePlayer(playerRef);
+            VerbatimCommandHandlers.executeFavList(player);
+        }
+    }
+
     // === Helpers ===
 
     private static HytaleGameCommandSource wrapSource(CommandContext ctx, PlayerRef playerRef) {

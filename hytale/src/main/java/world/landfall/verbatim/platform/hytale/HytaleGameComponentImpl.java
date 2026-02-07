@@ -72,6 +72,12 @@ public class HytaleGameComponentImpl implements GameComponent {
     }
 
     @Override
+    public GameComponent withRgbColor(int rgb) {
+        wrapped = wrapped.color(new java.awt.Color(rgb));
+        return this;
+    }
+
+    @Override
     public GameComponent withBold(boolean bold) {
         wrapped = wrapped.bold(bold);
         return this;

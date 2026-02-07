@@ -3,6 +3,7 @@ package world.landfall.verbatim.command;
 import world.landfall.verbatim.ChatChannelManager;
 import world.landfall.verbatim.Verbatim;
 import world.landfall.verbatim.util.NicknameService;
+import world.landfall.verbatim.util.SocialService;
 import world.landfall.verbatim.util.FormattingCodeUtils;
 import world.landfall.verbatim.context.GameColor;
 import world.landfall.verbatim.context.GameComponent;
@@ -10,9 +11,14 @@ import world.landfall.verbatim.context.GameCommandSource;
 import world.landfall.verbatim.context.GamePlayer;
 import static world.landfall.verbatim.context.GameText.*;
 
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.Optional;
 
 /**
@@ -176,6 +182,21 @@ public class VerbatimCommandHandlers {
     }
 
     public static int sendDirectMessage(GamePlayer sender, GamePlayer target, String message) {
+        if (SocialService.isIgnoring(sender, target.getUUID())) {
+            Verbatim.gameContext.sendMessage(sender, text("You have this player ignored. Unignore them to send a DM.").withColor(GameColor.RED));
+            return 0;
+        }
+
+        if (SocialService.isIgnoring(target, sender.getUUID())) {
+            Verbatim.gameContext.sendMessage(sender, text("Cannot send message to this player.").withColor(GameColor.RED));
+            if (SocialService.shouldNotifyBlock(target.getUUID(), sender.getUUID())) {
+                Verbatim.gameContext.sendMessage(target, text("Blocked a DM from ").withColor(GameColor.GRAY)
+                    .append(text(sender.getUsername()).withColor(GameColor.YELLOW))
+                    .append(text(" (ignored).").withColor(GameColor.GRAY)));
+            }
+            return 0;
+        }
+
         ChatChannelManager.focusDm(sender, target.getUUID());
 
         ChatChannelManager.setLastIncomingDmSender(target, sender.getUUID());
@@ -311,6 +332,174 @@ public class VerbatimCommandHandlers {
         } else {
             Verbatim.gameContext.sendMessage(player, text("You don't have a nickname set.").withColor(GameColor.YELLOW));
         }
+        return 1;
+    }
+
+    // === Ignore Commands ===
+
+    public static int executeIgnoreAdd(GamePlayer player, GamePlayer target) {
+        if (player.getUUID().equals(target.getUUID())) {
+            Verbatim.gameContext.sendMessage(player, text("You cannot ignore yourself.").withColor(GameColor.RED));
+            return 0;
+        }
+        if (SocialService.isIgnoring(player, target.getUUID())) {
+            Verbatim.gameContext.sendMessage(player, text("You are already ignoring ").withColor(GameColor.YELLOW)
+                .append(text(target.getUsername()).withColor(GameColor.WHITE))
+                .append(text(".").withColor(GameColor.YELLOW)));
+            return 0;
+        }
+        SocialService.addIgnore(player, target.getUUID());
+        Verbatim.gameContext.sendMessage(player, text("Now ignoring ").withColor(GameColor.GREEN)
+            .append(text(target.getUsername()).withColor(GameColor.WHITE))
+            .append(text(".").withColor(GameColor.GREEN)));
+        return 1;
+    }
+
+    public static int executeIgnoreRemove(GamePlayer player, String targetName) {
+        Set<UUID> ignored = SocialService.getIgnoredUUIDs(player);
+        if (ignored.isEmpty()) {
+            Verbatim.gameContext.sendMessage(player, text("Your ignore list is empty.").withColor(GameColor.YELLOW));
+            return 0;
+        }
+
+        // Try to find by online player name first
+        GamePlayer onlineTarget = Verbatim.gameContext.getPlayerByName(targetName);
+        if (onlineTarget != null && ignored.contains(onlineTarget.getUUID())) {
+            SocialService.removeIgnore(player, onlineTarget.getUUID());
+            Verbatim.gameContext.sendMessage(player, text("No longer ignoring ").withColor(GameColor.GREEN)
+                .append(text(onlineTarget.getUsername()).withColor(GameColor.WHITE))
+                .append(text(".").withColor(GameColor.GREEN)));
+            return 1;
+        }
+
+        // If not found online, search by name among all online players with matching UUID in ignore list
+        // Since we only store UUIDs, we need them to be online to match by name
+        Verbatim.gameContext.sendMessage(player, text("Player '").withColor(GameColor.RED)
+            .append(text(targetName).withColor(GameColor.WHITE))
+            .append(text("' not found in your ignore list or is not online.").withColor(GameColor.RED)));
+        return 0;
+    }
+
+    public static int executeIgnoreList(GamePlayer player) {
+        Set<UUID> ignored = SocialService.getIgnoredUUIDs(player);
+        if (ignored.isEmpty()) {
+            Verbatim.gameContext.sendMessage(player, text("Your ignore list is empty.").withColor(GameColor.YELLOW));
+            return 1;
+        }
+
+        GameComponent message = text("Your Ignored Players (" + ignored.size() + "):").withColor(GameColor.GOLD);
+
+        for (UUID uuid : ignored) {
+            GamePlayer onlinePlayer = Verbatim.gameContext.getPlayerByUUID(uuid);
+            String displayName = onlinePlayer != null ? onlinePlayer.getUsername() : uuid.toString();
+            message = message.append(text("\n ")).append(text(" x ").withColor(GameColor.RED))
+                .append(text(displayName).withColor(GameColor.GRAY));
+        }
+
+        Verbatim.gameContext.sendMessage(player, message);
+        return 1;
+    }
+
+    // === Favorite Commands ===
+
+    public static int executeFavAdd(GamePlayer player, GamePlayer target) {
+        if (player.getUUID().equals(target.getUUID())) {
+            Verbatim.gameContext.sendMessage(player, text("You cannot favorite yourself.").withColor(GameColor.RED));
+            return 0;
+        }
+        if (SocialService.isFavorited(player, target.getUUID())) {
+            Verbatim.gameContext.sendMessage(player, text("You have already favorited ").withColor(GameColor.YELLOW)
+                .append(text(target.getUsername()).withColor(GameColor.WHITE))
+                .append(text(".").withColor(GameColor.YELLOW)));
+            return 0;
+        }
+        SocialService.addFavorite(player, target.getUUID(), target.getUsername());
+        Verbatim.gameContext.sendMessage(player, text("Added ").withColor(GameColor.GREEN)
+            .append(text(target.getUsername()).withColor(GameColor.WHITE))
+            .append(text(" to your favorites.").withColor(GameColor.GREEN)));
+        return 1;
+    }
+
+    public static int executeFavRemove(GamePlayer player, String targetName) {
+        Map<UUID, SocialService.FavoriteMeta> meta = SocialService.getFavoriteMeta(player);
+        if (meta.isEmpty()) {
+            Verbatim.gameContext.sendMessage(player, text("Your favorites list is empty.").withColor(GameColor.YELLOW));
+            return 0;
+        }
+
+        // Search by name in metadata
+        for (Map.Entry<UUID, SocialService.FavoriteMeta> entry : meta.entrySet()) {
+            if (entry.getValue().name.equalsIgnoreCase(targetName)) {
+                SocialService.removeFavorite(player, entry.getKey());
+                Verbatim.gameContext.sendMessage(player, text("Removed ").withColor(GameColor.GREEN)
+                    .append(text(entry.getValue().name).withColor(GameColor.WHITE))
+                    .append(text(" from your favorites.").withColor(GameColor.GREEN)));
+                return 1;
+            }
+        }
+
+        // Also try by online player name
+        GamePlayer onlineTarget = Verbatim.gameContext.getPlayerByName(targetName);
+        if (onlineTarget != null && SocialService.isFavorited(player, onlineTarget.getUUID())) {
+            SocialService.removeFavorite(player, onlineTarget.getUUID());
+            Verbatim.gameContext.sendMessage(player, text("Removed ").withColor(GameColor.GREEN)
+                .append(text(onlineTarget.getUsername()).withColor(GameColor.WHITE))
+                .append(text(" from your favorites.").withColor(GameColor.GREEN)));
+            return 1;
+        }
+
+        Verbatim.gameContext.sendMessage(player, text("Player '").withColor(GameColor.RED)
+            .append(text(targetName).withColor(GameColor.WHITE))
+            .append(text("' not found in your favorites.").withColor(GameColor.RED)));
+        return 0;
+    }
+
+    public static int executeFavList(GamePlayer player) {
+        Set<UUID> favorites = SocialService.getFavoriteUUIDs(player);
+        if (favorites.isEmpty()) {
+            Verbatim.gameContext.sendMessage(player, text("Your favorites list is empty.").withColor(GameColor.YELLOW));
+            return 1;
+        }
+
+        Map<UUID, SocialService.FavoriteMeta> meta = SocialService.getFavoriteMeta(player);
+
+        List<Map.Entry<UUID, SocialService.FavoriteMeta>> online = new ArrayList<>();
+        List<Map.Entry<UUID, SocialService.FavoriteMeta>> offline = new ArrayList<>();
+
+        for (UUID uuid : favorites) {
+            SocialService.FavoriteMeta favMeta = meta.get(uuid);
+            String name = favMeta != null ? favMeta.name : uuid.toString();
+            long lastSeen = favMeta != null ? favMeta.lastSeen : 0;
+
+            GamePlayer onlinePlayer = Verbatim.gameContext.getPlayerByUUID(uuid);
+            Map.Entry<UUID, SocialService.FavoriteMeta> entry = Map.entry(uuid,
+                new SocialService.FavoriteMeta(onlinePlayer != null ? onlinePlayer.getUsername() : name, lastSeen));
+
+            if (onlinePlayer != null) {
+                online.add(entry);
+            } else {
+                offline.add(entry);
+            }
+        }
+
+        GameComponent message = text("Your Favorites (" + favorites.size() + "):").withColor(GameColor.GOLD);
+
+        for (Map.Entry<UUID, SocialService.FavoriteMeta> entry : online) {
+            message = message.append(text("\n ")).append(text(" * ").withColor(GameColor.GOLD))
+                .append(text(entry.getValue().name).withColor(GameColor.GREEN))
+                .append(text(" - Online").withColor(GameColor.GREEN));
+        }
+
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy h:mm a");
+        for (Map.Entry<UUID, SocialService.FavoriteMeta> entry : offline) {
+            message = message.append(text("\n ")).append(text(" * ").withColor(GameColor.GOLD))
+                .append(text(entry.getValue().name).withColor(GameColor.GRAY));
+            if (entry.getValue().lastSeen > 0) {
+                message = message.append(text(" - Last seen: " + sdf.format(new Date(entry.getValue().lastSeen))).withColor(GameColor.GRAY));
+            }
+        }
+
+        Verbatim.gameContext.sendMessage(player, message);
         return 1;
     }
 }

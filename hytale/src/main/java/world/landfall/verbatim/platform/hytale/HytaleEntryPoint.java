@@ -9,18 +9,8 @@ import world.landfall.verbatim.ChatChannelManager;
 import world.landfall.verbatim.Verbatim;
 import world.landfall.verbatim.discord.DiscordBot;
 
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
-
 import javax.annotation.Nonnull;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.lang.reflect.Type;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Hytale plugin entry point for the Verbatim chat channel system.
@@ -30,11 +20,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class HytaleEntryPoint extends JavaPlugin {
 
-    private static final String PLAYER_DATA_FILE = "playerdata.json";
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-
     private HytaleVerbatimConfig verbatimConfig;
     private HytaleGameContextImpl gameContextImpl;
+    private PlayerFileStore fileStore;
+    private PersistenceScheduler persistenceScheduler;
     private File dataDir;
 
     public HytaleEntryPoint(@Nonnull JavaPluginInit init) {
@@ -53,9 +42,13 @@ public class HytaleEntryPoint extends JavaPlugin {
         dataDir = getDataDirectory().toFile();
         verbatimConfig = HytaleVerbatimConfig.loadOrCreate(dataDir);
 
-        // Initialize the game context (manages player data persistence)
+        // Initialize per-player file store for crash-resilient persistence
+        File playerStoreDir = new File(dataDir, "playerstore");
+        fileStore = new PlayerFileStore(playerStoreDir);
+
+        // Initialize the game context and wire the file store
         gameContextImpl = new HytaleGameContextImpl();
-        loadPlayerData();
+        gameContextImpl.setFileStore(fileStore);
 
         // Wire all platform-independent services via the service locator
         Verbatim.gameContext = gameContextImpl;
@@ -86,8 +79,11 @@ public class HytaleEntryPoint extends JavaPlugin {
         this.getCommandRegistry().registerCommand(new HytaleCommandRegistrar.ChKickCommand());
         // Nicknames
         this.getCommandRegistry().registerCommand(new HytaleCommandRegistrar.NickCommand());
+        // Social (ignore & favorites)
+        this.getCommandRegistry().registerCommand(new HytaleCommandRegistrar.IgnoreCommand());
+        this.getCommandRegistry().registerCommand(new HytaleCommandRegistrar.FavCommand());
 
-        Verbatim.LOGGER.info("[Verbatim] Plugin setup complete. Commands registered: /channel, /channels, /msg (/tell), /r, /list, /vlist, /chlist, /chkick, /nick");
+        Verbatim.LOGGER.info("[Verbatim] Plugin setup complete. Commands registered: /channel, /channels, /msg (/tell), /r, /list, /vlist, /chlist, /chkick, /nick, /ignore, /fav");
     }
 
     @Override
@@ -99,6 +95,10 @@ public class HytaleEntryPoint extends JavaPlugin {
         // Load chat channel configurations
         Verbatim.LOGGER.info("[Verbatim] Loading chat channel configurations...");
         ChatChannelManager.loadConfiguredChannels();
+
+        // Start periodic auto-save scheduler
+        persistenceScheduler = new PersistenceScheduler(gameContextImpl::saveAllPlayersToDisk);
+        persistenceScheduler.start();
 
         // Initialize Discord bot
         Verbatim.LOGGER.info("[Verbatim] Initializing Discord Bot...");
@@ -113,6 +113,11 @@ public class HytaleEntryPoint extends JavaPlugin {
     protected void shutdown() {
         Verbatim.LOGGER.info("[Verbatim] Shutting down Verbatim plugin...");
 
+        // Stop auto-save scheduler
+        if (persistenceScheduler != null) {
+            persistenceScheduler.shutdown();
+        }
+
         // Save all online players' channel state BEFORE the file write
         // (disconnect events fire AFTER shutdown(), so we must save state now)
         for (world.landfall.verbatim.context.GamePlayer player : Verbatim.gameContext.getAllOnlinePlayers()) {
@@ -123,47 +128,10 @@ public class HytaleEntryPoint extends JavaPlugin {
         // Shut down Discord bot
         DiscordBot.shutdown();
 
-        // Save persistent player data to file
-        savePlayerData();
+        // Final flush of all player data to disk
+        gameContextImpl.saveAllPlayersToDisk();
 
         Verbatim.LOGGER.info("[Verbatim] Verbatim plugin shut down.");
         super.shutdown();
-    }
-
-    private void loadPlayerData() {
-        File file = new File(dataDir, PLAYER_DATA_FILE);
-        Verbatim.LOGGER.info("[Verbatim] Looking for player data at: {}", file.getAbsolutePath());
-        if (!file.exists()) {
-            Verbatim.LOGGER.info("[Verbatim] No player data file found, starting fresh.");
-            return;
-        }
-
-        try (FileReader reader = new FileReader(file)) {
-            Type type = new TypeToken<HashMap<String, String>>(){}.getType();
-            Map<String, String> data = GSON.fromJson(reader, type);
-            if (data != null) {
-                gameContextImpl.loadPersistentData(new ConcurrentHashMap<>(data));
-                Verbatim.LOGGER.info("[Verbatim] Loaded player data ({} entries): {}", data.size(), data.keySet());
-            } else {
-                Verbatim.LOGGER.warn("[Verbatim] Player data file was empty or invalid JSON.");
-            }
-        } catch (Exception e) {
-            Verbatim.LOGGER.error("[Verbatim] Failed to load player data: {}", e.getMessage());
-        }
-    }
-
-    private void savePlayerData() {
-        dataDir.mkdirs();
-        File file = new File(dataDir, PLAYER_DATA_FILE);
-        Verbatim.LOGGER.info("[Verbatim] Saving player data to: {}", file.getAbsolutePath());
-        try (FileWriter writer = new FileWriter(file)) {
-            ConcurrentHashMap<String, String> data = gameContextImpl.getPersistentDataMap();
-            Verbatim.LOGGER.info("[Verbatim] Saving player data ({} entries): {}", data.size(), data.keySet());
-            GSON.toJson(data, writer);
-            writer.flush();
-            Verbatim.LOGGER.info("[Verbatim] Player data saved successfully.");
-        } catch (Exception e) {
-            Verbatim.LOGGER.error("[Verbatim] Failed to save player data: {}", e.getMessage(), e);
-        }
     }
 }

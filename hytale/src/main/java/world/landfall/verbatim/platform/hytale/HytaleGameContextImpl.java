@@ -4,13 +4,16 @@ import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.NameMatching;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.Universe;
+import world.landfall.verbatim.Verbatim;
 import world.landfall.verbatim.context.GameCommandSource;
 import world.landfall.verbatim.context.GameComponent;
 import world.landfall.verbatim.context.GameContext;
 import world.landfall.verbatim.context.GamePlayer;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
@@ -24,9 +27,15 @@ public class HytaleGameContextImpl implements GameContext {
     /**
      * In-memory persistent data store keyed by player UUID + data key.
      * Hytale doesn't have Minecraft's NBT PersistentData out of the box,
-     * so we use a simple in-memory map (backed by file persistence in HytaleEntryPoint).
+     * so we use a simple in-memory map (backed by per-player file persistence).
      */
     private final ConcurrentHashMap<String, String> persistentData = new ConcurrentHashMap<>();
+
+    /** Per-player file store for crash-resilient persistence. */
+    private PlayerFileStore fileStore;
+
+    /** Tracks online player UUIDs to their last known usernames (for file saves). */
+    private final ConcurrentHashMap<UUID, String> onlinePlayerUsernames = new ConcurrentHashMap<>();
 
     /**
      * Unwraps a GamePlayer to a PlayerRef. For use in platform layer only.
@@ -36,6 +45,13 @@ public class HytaleGameContextImpl implements GameContext {
             return hp.getHandle();
         }
         throw new IllegalArgumentException("GamePlayer is not a HytaleGamePlayer: " + player);
+    }
+
+    /**
+     * Sets the file store used for per-player persistence.
+     */
+    public void setFileStore(PlayerFileStore fileStore) {
+        this.fileStore = fileStore;
     }
 
     // === Server Operations ===
@@ -186,7 +202,7 @@ public class HytaleGameContextImpl implements GameContext {
         }
         String fullKey = dataKey(player, key);
         boolean has = persistentData.containsKey(fullKey);
-        world.landfall.verbatim.Verbatim.LOGGER.debug("[Verbatim] hasPlayerData: {} = {}", fullKey, has);
+        Verbatim.LOGGER.debug("[Verbatim] hasPlayerData: {} = {}", fullKey, has);
         return has;
     }
 
@@ -197,7 +213,7 @@ public class HytaleGameContextImpl implements GameContext {
         }
         String fullKey = dataKey(player, key);
         String value = persistentData.getOrDefault(fullKey, "");
-        world.landfall.verbatim.Verbatim.LOGGER.debug("[Verbatim] getPlayerStringData: {} = {}", fullKey, value);
+        Verbatim.LOGGER.debug("[Verbatim] getPlayerStringData: {} = {}", fullKey, value);
         return value;
     }
 
@@ -208,7 +224,8 @@ public class HytaleGameContextImpl implements GameContext {
         }
         String fullKey = dataKey(player, key);
         persistentData.put(fullKey, value);
-        world.landfall.verbatim.Verbatim.LOGGER.debug("[Verbatim] setPlayerStringData: {} = {}", fullKey, value);
+        Verbatim.LOGGER.debug("[Verbatim] setPlayerStringData: {} = {}", fullKey, value);
+        schedulePlayerSave(player);
     }
 
     @Override
@@ -217,20 +234,101 @@ public class HytaleGameContextImpl implements GameContext {
             return;
         }
         persistentData.remove(dataKey(player, key));
+        schedulePlayerSave(player);
+    }
+
+    // === Per-Player Persistence ===
+
+    /**
+     * Saves a single player's data to disk immediately.
+     * Extracts all entries belonging to this player from the in-memory map.
+     */
+    private void schedulePlayerSave(GamePlayer player) {
+        if (fileStore == null) {
+            return;
+        }
+        UUID uuid = player.getUUID();
+        String prefix = uuid.toString() + ":";
+        Map<String, String> playerData = new HashMap<>();
+        for (Map.Entry<String, String> entry : persistentData.entrySet()) {
+            if (entry.getKey().startsWith(prefix)) {
+                // Store with the key minus the UUID prefix
+                playerData.put(entry.getKey().substring(prefix.length()), entry.getValue());
+            }
+        }
+        String username = onlinePlayerUsernames.getOrDefault(uuid, player.getUsername());
+        fileStore.savePlayer(uuid, username, playerData);
     }
 
     /**
-     * Gets the persistent data map for serialization by the entry point.
+     * Loads a player's data from disk into the in-memory map.
+     * Called when a player joins the server.
      */
-    public ConcurrentHashMap<String, String> getPersistentDataMap() {
-        return persistentData;
+    public void loadPlayerFromDisk(UUID uuid) {
+        if (fileStore == null) {
+            return;
+        }
+        Map<String, String> data = fileStore.loadPlayer(uuid);
+        String prefix = uuid.toString() + ":";
+        for (Map.Entry<String, String> entry : data.entrySet()) {
+            persistentData.put(prefix + entry.getKey(), entry.getValue());
+        }
+        if (!data.isEmpty()) {
+            Verbatim.LOGGER.info("[Verbatim] Loaded {} data entries for player {}", data.size(), uuid);
+        }
     }
 
     /**
-     * Loads persistent data from an external source (called on startup).
+     * Saves all players' data to disk. Used by the periodic auto-save and shutdown flush.
+     * Groups all in-memory entries by UUID and writes each player file, then updates the index.
      */
-    public void loadPersistentData(ConcurrentHashMap<String, String> data) {
-        persistentData.putAll(data);
+    public void saveAllPlayersToDisk() {
+        if (fileStore == null) {
+            return;
+        }
+
+        // Group all persistent data entries by player UUID
+        Map<UUID, Map<String, String>> grouped = new HashMap<>();
+        for (Map.Entry<String, String> entry : persistentData.entrySet()) {
+            int colonIdx = entry.getKey().indexOf(':');
+            if (colonIdx < 0) {
+                continue;
+            }
+            String uuidStr = entry.getKey().substring(0, colonIdx);
+            String dataKey = entry.getKey().substring(colonIdx + 1);
+            try {
+                UUID uuid = UUID.fromString(uuidStr);
+                grouped.computeIfAbsent(uuid, k -> new HashMap<>()).put(dataKey, entry.getValue());
+            } catch (IllegalArgumentException e) {
+                Verbatim.LOGGER.warn("[Verbatim] Skipping entry with invalid UUID key: {}", entry.getKey());
+            }
+        }
+
+        // Save each player and build the index
+        Map<String, PlayerFileStore.IndexEntry> index = new ConcurrentHashMap<>();
+        for (Map.Entry<UUID, Map<String, String>> playerEntry : grouped.entrySet()) {
+            UUID uuid = playerEntry.getKey();
+            String username = onlinePlayerUsernames.getOrDefault(uuid, uuid.toString());
+            fileStore.savePlayer(uuid, username, playerEntry.getValue());
+            index.put(uuid.toString(), new PlayerFileStore.IndexEntry(username, System.currentTimeMillis()));
+        }
+
+        fileStore.saveIndex(index);
+        Verbatim.LOGGER.info("[Verbatim] Saved all player data ({} players)", grouped.size());
+    }
+
+    /**
+     * Tracks a player as online with their username (for save operations).
+     */
+    public void trackPlayerOnline(UUID uuid, String username) {
+        onlinePlayerUsernames.put(uuid, username);
+    }
+
+    /**
+     * Removes a player from online tracking.
+     */
+    public void trackPlayerOffline(UUID uuid) {
+        onlinePlayerUsernames.remove(uuid);
     }
 
     // === Permissions ===

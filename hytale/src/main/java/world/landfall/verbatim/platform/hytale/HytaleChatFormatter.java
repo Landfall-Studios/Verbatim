@@ -125,6 +125,8 @@ public class HytaleChatFormatter implements ChatFormatter {
         return HytaleGameComponentImpl.wrap(makeLinksClickableInternal(text, baseColor));
     }
 
+    private static final String COLOR_SPLIT_REGEX = "(?i)(?=&#[0-9a-f]{6})|(?=&[0-9a-fk-or])";
+
     @Override
     public GameComponent parseColors(String text) {
         if (text == null || text.isEmpty()) {
@@ -132,7 +134,7 @@ public class HytaleChatFormatter implements ChatFormatter {
         }
 
         Message result = Message.raw("");
-        String[] parts = text.split("(?i)(?=&[0-9a-fk-or])");
+        String[] parts = text.split(COLOR_SPLIT_REGEX);
         Color currentColor = null;
         boolean currentBold = false;
         boolean currentItalic = false;
@@ -140,7 +142,16 @@ public class HytaleChatFormatter implements ChatFormatter {
         for (String part : parts) {
             if (part.isEmpty()) continue;
 
-            if (part.startsWith("&") && part.length() >= 2) {
+            if (part.startsWith("&#") && part.length() >= 8) {
+                String hex = part.substring(2, 8);
+                String textContent = part.substring(8);
+                try {
+                    currentColor = new Color(Integer.parseInt(hex, 16));
+                } catch (NumberFormatException ignored) {}
+                if (!textContent.isEmpty()) {
+                    result = Message.join(result, makeLinksClickableInternal(textContent, currentColor, currentBold, currentItalic));
+                }
+            } else if (part.startsWith("&") && part.length() >= 2) {
                 char code = Character.toLowerCase(part.charAt(1));
                 String textContent = part.substring(2);
 
@@ -156,7 +167,6 @@ public class HytaleChatFormatter implements ChatFormatter {
                     currentBold = false;
                     currentItalic = false;
                 }
-                // &k (obfuscated), &m (strikethrough), &n (underline) not available in Hytale
 
                 if (!textContent.isEmpty()) {
                     result = Message.join(result, makeLinksClickableInternal(textContent, currentColor, currentBold, currentItalic));
@@ -178,7 +188,7 @@ public class HytaleChatFormatter implements ChatFormatter {
         boolean hasFormatPerm = Verbatim.permissionService.hasPermission(player, NicknameService.PERM_CHAT_FORMAT, 2);
 
         Message result = Message.raw("");
-        String[] parts = text.split("(?i)(?=&[0-9a-fk-or])");
+        String[] parts = text.split(COLOR_SPLIT_REGEX);
         Color currentColor = null;
         boolean currentBold = false;
         boolean currentItalic = false;
@@ -186,7 +196,18 @@ public class HytaleChatFormatter implements ChatFormatter {
         for (String part : parts) {
             if (part.isEmpty()) continue;
 
-            if (part.startsWith("&") && part.length() >= 2) {
+            if (part.startsWith("&#") && part.length() >= 8) {
+                String hex = part.substring(2, 8);
+                String content = part.substring(8);
+                if (hasColorPerm) {
+                    try {
+                        currentColor = new Color(Integer.parseInt(hex, 16));
+                    } catch (NumberFormatException ignored) {}
+                }
+                if (!content.isEmpty()) {
+                    result = Message.join(result, makeLinksClickableInternal(content, currentColor, currentBold, currentItalic));
+                }
+            } else if (part.startsWith("&") && part.length() >= 2) {
                 char code = Character.toLowerCase(part.charAt(1));
                 String content = part.substring(2);
 
@@ -223,13 +244,18 @@ public class HytaleChatFormatter implements ChatFormatter {
         // Parse the base color from the channel color prefix
         Color baseColor = null;
         if (channelBaseColor != null && !channelBaseColor.isEmpty()) {
-            String stripped = channelBaseColor.replaceAll("(?i)&[0-9a-fk-or]", "");
-            // Extract the last color code from the prefix
-            String[] colorParts = channelBaseColor.split("(?i)(?=&[0-9a-f])");
-            for (String cp : colorParts) {
-                if (cp.startsWith("&") && cp.length() >= 2) {
-                    Color c = codeToColor(cp.charAt(1));
-                    if (c != null) baseColor = c;
+            // Support hex base color
+            if (channelBaseColor.startsWith("&#") && channelBaseColor.length() >= 8) {
+                try {
+                    baseColor = new Color(Integer.parseInt(channelBaseColor.substring(2, 8), 16));
+                } catch (NumberFormatException ignored) {}
+            } else {
+                String[] colorParts = channelBaseColor.split("(?i)(?=&[0-9a-f])");
+                for (String cp : colorParts) {
+                    if (cp.startsWith("&") && cp.length() >= 2) {
+                        Color c = codeToColor(cp.charAt(1));
+                        if (c != null) baseColor = c;
+                    }
                 }
             }
         }
@@ -238,7 +264,7 @@ public class HytaleChatFormatter implements ChatFormatter {
         boolean hasFormatPerm = Verbatim.permissionService.hasPermission(player, NicknameService.PERM_CHAT_FORMAT, 2);
 
         Message result = Message.raw("");
-        String[] parts = playerInput.split("(?i)(?=&[0-9a-fk-or])");
+        String[] parts = playerInput.split(COLOR_SPLIT_REGEX);
         Color currentColor = baseColor;
         boolean currentBold = false;
         boolean currentItalic = false;
@@ -246,7 +272,18 @@ public class HytaleChatFormatter implements ChatFormatter {
         for (String part : parts) {
             if (part.isEmpty()) continue;
 
-            if (part.startsWith("&") && part.length() >= 2) {
+            if (part.startsWith("&#") && part.length() >= 8) {
+                String hex = part.substring(2, 8);
+                String content = part.substring(8);
+                if (hasColorPerm) {
+                    try {
+                        currentColor = new Color(Integer.parseInt(hex, 16));
+                    } catch (NumberFormatException ignored) {}
+                }
+                if (!content.isEmpty()) {
+                    result = Message.join(result, makeLinksClickableInternal(content, currentColor, currentBold, currentItalic));
+                }
+            } else if (part.startsWith("&") && part.length() >= 2) {
                 char code = Character.toLowerCase(part.charAt(1));
                 String content = part.substring(2);
 
@@ -320,6 +357,57 @@ public class HytaleChatFormatter implements ChatFormatter {
     @Override
     public GameComponent createPlayerNameComponent(GamePlayer player, String colorPrefix, boolean isDM) {
         return createPlayerNameComponent(player, colorPrefix, isDM, null);
+    }
+
+    @Override
+    public GameComponent createFavoriteNameComponent(GamePlayer player, String colorPrefix, boolean isDM, NameStyle nameStyle, int gradientStartRgb, int gradientEndRgb) {
+        String username = player.getUsername();
+        String displayName = player.getDisplayName();
+        String strippedDisplayName = FormattingCodeUtils.stripFormattingCodes(displayName);
+
+        String nameToShow;
+
+        if (isDM) {
+            nameToShow = username;
+        } else if (nameStyle != null) {
+            nameToShow = NicknameService.getNameForStyle(player, nameStyle);
+        } else {
+            if (!username.equals(strippedDisplayName)) {
+                nameToShow = strippedDisplayName;
+            } else {
+                nameToShow = username;
+            }
+        }
+
+        // Strip any embedded color codes — the gradient replaces them
+        nameToShow = FormattingCodeUtils.stripFormattingCodes(nameToShow);
+
+        String playerPrefix = "";
+        if (Verbatim.prefixService != null && Verbatim.prefixService.isPrefixSystemAvailable()) {
+            playerPrefix = Verbatim.prefixService.getPlayerPrefix(player);
+        }
+
+        Message fullName = Message.raw("");
+
+        if (!playerPrefix.isEmpty()) {
+            Message prefixMsg = ((HytaleGameComponentImpl) parseColors(playerPrefix)).toHytale();
+            fullName = Message.join(fullName, prefixMsg);
+            if (!playerPrefix.endsWith(" ")) {
+                fullName = Message.join(fullName, Message.raw(" "));
+            }
+        }
+
+        // Apply gradient to name characters
+        int len = nameToShow.length();
+        for (int i = 0; i < len; i++) {
+            float ratio = len > 1 ? (float) i / (len - 1) : 0f;
+            int r = Math.round(((gradientStartRgb >> 16) & 0xFF) + ratio * (((gradientEndRgb >> 16) & 0xFF) - ((gradientStartRgb >> 16) & 0xFF)));
+            int g = Math.round(((gradientStartRgb >> 8) & 0xFF) + ratio * (((gradientEndRgb >> 8) & 0xFF) - ((gradientStartRgb >> 8) & 0xFF)));
+            int b = Math.round((gradientStartRgb & 0xFF) + ratio * ((gradientEndRgb & 0xFF) - (gradientStartRgb & 0xFF)));
+            fullName = Message.join(fullName, Message.raw(String.valueOf(nameToShow.charAt(i))).color(new Color(r, g, b)));
+        }
+
+        return HytaleGameComponentImpl.wrap(fullName);
     }
 
     @Override

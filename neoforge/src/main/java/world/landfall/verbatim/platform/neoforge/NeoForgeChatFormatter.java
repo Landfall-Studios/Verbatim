@@ -86,6 +86,8 @@ public class NeoForgeChatFormatter implements ChatFormatter {
         return NeoForgeGameComponentImpl.wrap(makeLinksClickableInternal(text, baseStyle));
     }
 
+    private static final String COLOR_SPLIT_REGEX = "(?i)(?=&#[0-9a-f]{6})|(?=&[0-9a-fk-or])";
+
     @Override
     public GameComponent parseColors(String text) {
         if (text == null || text.isEmpty()) {
@@ -93,14 +95,23 @@ public class NeoForgeChatFormatter implements ChatFormatter {
         }
 
         MutableComponent mainComponent = Component.literal("");
-        String[] parts = text.split("(?i)(?=&[0-9a-fk-or])");
+        String[] parts = text.split(COLOR_SPLIT_REGEX);
 
         Style currentStyle = Style.EMPTY;
 
         for (String part : parts) {
             if (part.isEmpty()) continue;
 
-            if (part.startsWith("&") && part.length() >= 2) {
+            if (part.startsWith("&#") && part.length() >= 8) {
+                String hex = part.substring(2, 8);
+                String textContent = part.substring(8);
+                try {
+                    currentStyle = Style.EMPTY.withColor(net.minecraft.network.chat.TextColor.fromRgb(Integer.parseInt(hex, 16)));
+                } catch (NumberFormatException ignored) {}
+                if (!textContent.isEmpty()) {
+                    mainComponent.append(makeLinksClickableInternal(textContent, currentStyle));
+                }
+            } else if (part.startsWith("&") && part.length() >= 2) {
                 char code = part.charAt(1);
                 ChatFormatting formatting = ChatFormatting.getByCode(code);
                 String textContent = part.substring(2);
@@ -226,6 +237,98 @@ public class NeoForgeChatFormatter implements ChatFormatter {
     }
 
     @Override
+    public GameComponent createFavoriteNameComponent(GamePlayer player, String colorPrefix, boolean isDM, NameStyle nameStyle, int gradientStartRgb, int gradientEndRgb) {
+        String username = player.getUsername();
+        String displayName = player.getDisplayName();
+        String strippedDisplayName = FormattingCodeUtils.stripFormattingCodes(displayName);
+
+        ClickEvent clickEvent = new ClickEvent(ClickEvent.Action.SUGGEST_COMMAND, "/msg " + username + " ");
+        HoverEvent hoverEvent = null;
+
+        String nameToShow;
+
+        if (isDM) {
+            nameToShow = username;
+        } else if (nameStyle != null) {
+            nameToShow = NicknameService.getNameForStyle(player, nameStyle);
+
+            if (nameStyle == NameStyle.NICKNAME) {
+                String nickname = NicknameService.getNickname(player);
+                if (nickname != null && !nickname.trim().isEmpty()) {
+                    hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                            Component.literal("Username: " + username).withStyle(ChatFormatting.GRAY));
+                }
+            } else if (nameStyle == NameStyle.DISPLAY_NAME && !username.equals(strippedDisplayName)) {
+                hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                        Component.literal("Username: " + username).withStyle(ChatFormatting.GRAY));
+            }
+        } else {
+            if (!username.equals(strippedDisplayName)) {
+                nameToShow = strippedDisplayName;
+                hoverEvent = new HoverEvent(HoverEvent.Action.SHOW_TEXT,
+                                        Component.literal("Username: " + username).withStyle(ChatFormatting.GRAY));
+            } else {
+                nameToShow = username;
+            }
+        }
+
+        // Strip any embedded color codes — the gradient replaces them
+        nameToShow = FormattingCodeUtils.stripFormattingCodes(nameToShow);
+
+        String luckPermsPrefix = "";
+        final String prefixTooltipText;
+
+        if (Verbatim.prefixService != null && Verbatim.prefixService.isPrefixSystemAvailable()) {
+            luckPermsPrefix = Verbatim.prefixService.getPlayerPrefix(player);
+            if (!luckPermsPrefix.isEmpty()) {
+                prefixTooltipText = Verbatim.prefixService.getPrefixTooltip(player);
+            } else {
+                prefixTooltipText = null;
+            }
+        } else {
+            prefixTooltipText = null;
+        }
+
+        MutableComponent fullNameComponent = Component.empty();
+
+        if (!luckPermsPrefix.isEmpty()) {
+            MutableComponent prefixComponent = ((NeoForgeGameComponentImpl) parseColors(luckPermsPrefix)).toMinecraftMutable();
+            if (prefixTooltipText != null && !prefixTooltipText.isEmpty()) {
+                Component tooltipComponent = ((NeoForgeGameComponentImpl) parseColors(prefixTooltipText)).toMinecraft();
+                prefixComponent = prefixComponent.withStyle(style ->
+                    style.withHoverEvent(new HoverEvent(HoverEvent.Action.SHOW_TEXT, tooltipComponent))
+                );
+            }
+            fullNameComponent.append(prefixComponent);
+            if (!luckPermsPrefix.endsWith(" ")) {
+                fullNameComponent.append(Component.literal(" "));
+            }
+        }
+
+        // Apply gradient to name characters
+        int len = nameToShow.length();
+        final HoverEvent finalHoverEvent = hoverEvent;
+        for (int i = 0; i < len; i++) {
+            float ratio = len > 1 ? (float) i / (len - 1) : 0f;
+            int r = Math.round(((gradientStartRgb >> 16) & 0xFF) + ratio * (((gradientEndRgb >> 16) & 0xFF) - ((gradientStartRgb >> 16) & 0xFF)));
+            int g = Math.round(((gradientStartRgb >> 8) & 0xFF) + ratio * (((gradientEndRgb >> 8) & 0xFF) - ((gradientStartRgb >> 8) & 0xFF)));
+            int b = Math.round((gradientStartRgb & 0xFF) + ratio * ((gradientEndRgb & 0xFF) - (gradientStartRgb & 0xFF)));
+
+            MutableComponent charComponent = Component.literal(String.valueOf(nameToShow.charAt(i)));
+            Style charStyle = Style.EMPTY
+                .withColor(net.minecraft.network.chat.TextColor.fromRgb((r << 16) | (g << 8) | b))
+                .withClickEvent(clickEvent);
+            if (finalHoverEvent != null) {
+                charStyle = charStyle.withHoverEvent(finalHoverEvent);
+            }
+            charComponent.setStyle(charStyle);
+            fullNameComponent.append(charComponent);
+        }
+
+        return NeoForgeGameComponentImpl.wrap(fullNameComponent);
+    }
+
+    @Override
     public String createDiscordPlayerName(GamePlayer player, NameStyle nameStyle) {
         String username = player.getUsername();
 
@@ -276,13 +379,24 @@ public class NeoForgeChatFormatter implements ChatFormatter {
         boolean hasFormatPerm = Verbatim.permissionService.hasPermission(player, NicknameService.PERM_CHAT_FORMAT, 2);
 
         MutableComponent main = Component.literal("");
-        String[] parts = text.split("(?i)(?=&[0-9a-fk-or])");
+        String[] parts = text.split(COLOR_SPLIT_REGEX);
         Style current = Style.EMPTY;
 
         for (String part : parts) {
             if (part.isEmpty()) continue;
 
-            if (part.startsWith("&") && part.length() >= 2) {
+            if (part.startsWith("&#") && part.length() >= 8) {
+                String hex = part.substring(2, 8);
+                String content = part.substring(8);
+                if (hasColorPerm) {
+                    try {
+                        current = Style.EMPTY.withColor(net.minecraft.network.chat.TextColor.fromRgb(Integer.parseInt(hex, 16)));
+                    } catch (NumberFormatException ignored) {}
+                }
+                if (!content.isEmpty()) {
+                    main.append(makeLinksClickableInternal(content, current));
+                }
+            } else if (part.startsWith("&") && part.length() >= 2) {
                 char code = part.charAt(1);
                 ChatFormatting fmt = ChatFormatting.getByCode(code);
                 String content = part.substring(2);
@@ -331,13 +445,24 @@ public class NeoForgeChatFormatter implements ChatFormatter {
         boolean hasColorPerm  = Verbatim.permissionService.hasPermission(player, NicknameService.PERM_CHAT_COLOR, 2);
         boolean hasFormatPerm = Verbatim.permissionService.hasPermission(player, NicknameService.PERM_CHAT_FORMAT, 2);
 
-        String[] parts = playerInput.split("(?i)(?=&[0-9a-fk-or])");
+        String[] parts = playerInput.split(COLOR_SPLIT_REGEX);
         Style current = baseStyle;
 
         for (String part : parts) {
             if (part.isEmpty()) continue;
 
-            if (part.startsWith("&") && part.length() >= 2) {
+            if (part.startsWith("&#") && part.length() >= 8) {
+                String hex = part.substring(2, 8);
+                String content = part.substring(8);
+                if (hasColorPerm) {
+                    try {
+                        current = Style.EMPTY.withColor(net.minecraft.network.chat.TextColor.fromRgb(Integer.parseInt(hex, 16)));
+                    } catch (NumberFormatException ignored) {}
+                }
+                if (!content.isEmpty()) {
+                    result.append(makeLinksClickableInternal(content, current));
+                }
+            } else if (part.startsWith("&") && part.length() >= 2) {
                 char code = part.charAt(1);
                 ChatFormatting fmt = ChatFormatting.getByCode(code);
                 String content = part.substring(2);

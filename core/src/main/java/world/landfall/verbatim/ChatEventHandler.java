@@ -8,6 +8,7 @@ import world.landfall.verbatim.context.GamePlayer;
 import world.landfall.verbatim.specialchannels.FormattedMessageDetails;
 import world.landfall.verbatim.discord.DiscordBot;
 import world.landfall.verbatim.util.NicknameService;
+import world.landfall.verbatim.util.SocialService;
 import static world.landfall.verbatim.context.GameText.*;
 
 import java.util.Optional;
@@ -23,6 +24,8 @@ public class ChatEventHandler {
         }
 
         ChatChannelManager.playerLoggedIn(player);
+
+        SocialService.updateFavoriteMetaForPlayer(player.getUUID(), player.getUsername(), System.currentTimeMillis());
 
         if (Verbatim.gameConfig.isCustomJoinLeaveEnabled()) {
             String format = Verbatim.gameConfig.getJoinMessageFormat();
@@ -105,6 +108,8 @@ public class ChatEventHandler {
         }
         ChatChannelManager.playerLoggedOut(player);
         NicknameService.onPlayerLogout(player.getUUID());
+        SocialService.updateFavoriteMetaForPlayer(player.getUUID(), player.getUsername(), System.currentTimeMillis());
+        SocialService.onPlayerLogout(player.getUUID());
     }
 
     public static void onChat(GamePlayer sender, String rawMessageText) {
@@ -212,6 +217,21 @@ public class ChatEventHandler {
                     return;
                 }
 
+                if (SocialService.isIgnoring(sender, targetPlayer.getUUID())) {
+                    Verbatim.gameContext.sendMessage(sender, Verbatim.gameContext.createText("You have this player ignored. Unignore them to send a DM.").withColor(GameColor.RED));
+                    return;
+                }
+
+                if (SocialService.isIgnoring(targetPlayer, sender.getUUID())) {
+                    Verbatim.gameContext.sendMessage(sender, Verbatim.gameContext.createText("Cannot send message to this player.").withColor(GameColor.RED));
+                    if (SocialService.shouldNotifyBlock(targetPlayer.getUUID(), sender.getUUID())) {
+                        Verbatim.gameContext.sendMessage(targetPlayer, Verbatim.gameContext.createText("Blocked a DM from ").withColor(GameColor.GRAY)
+                            .append(Verbatim.gameContext.createText(sender.getUsername()).withColor(GameColor.YELLOW))
+                            .append(Verbatim.gameContext.createText(" (ignored).").withColor(GameColor.GRAY)));
+                    }
+                    return;
+                }
+
                 ChatChannelManager.setLastIncomingDmSender(targetPlayer, sender.getUUID());
 
                 GameComponent senderMessage = Verbatim.gameContext.createText("[You -> ")
@@ -257,6 +277,7 @@ public class ChatEventHandler {
                 Optional<FormattedMessageDetails> specialFormatResult = Verbatim.channelFormatter.formatLocalMessage(sender, finalTargetChannel, messageContent);
 
                 GameComponent finalMessage;
+                GameComponent favMessage = null;
                 int effectiveRange;
 
                 if (specialFormatResult.isPresent()) {
@@ -271,6 +292,13 @@ public class ChatEventHandler {
                         .append(Verbatim.chatFormatter.createPlayerNameComponent(sender, finalTargetChannel.nameColor, false, finalTargetChannel.nameStyle))
                         .append(Verbatim.chatFormatter.parseColors(finalTargetChannel.separatorColor + finalTargetChannel.separator))
                         .append(Verbatim.chatFormatter.parsePlayerInputWithPermissions(finalTargetChannel.messageColor, messageContent, sender));
+
+                    favMessage = empty()
+                        .append(Verbatim.chatFormatter.parseColors(finalTargetChannel.displayPrefix))
+                        .append(text(" "))
+                        .append(Verbatim.chatFormatter.createFavoriteNameComponent(sender, finalTargetChannel.nameColor, false, finalTargetChannel.nameStyle, 0xB8860B, 0xFFD700))
+                        .append(Verbatim.chatFormatter.parseColors(finalTargetChannel.separatorColor + finalTargetChannel.separator))
+                        .append(Verbatim.chatFormatter.parsePlayerInputWithPermissions(finalTargetChannel.messageColor, messageContent, sender));
                 }
 
                 if (!Verbatim.gameContext.isServerAvailable()) {
@@ -279,6 +307,9 @@ public class ChatEventHandler {
 
                 for (GamePlayer recipient : Verbatim.gameContext.getAllOnlinePlayers()) {
                     if (ChatChannelManager.isJoined(recipient, finalTargetChannel.name)) {
+                        if (!recipient.equals(sender) && SocialService.isIgnoring(recipient, sender.getUUID())) {
+                            continue;
+                        }
                         if (finalTargetChannel.alwaysOn || !finalTargetChannel.permission.isPresent() || Verbatim.permissionService.hasPermission(recipient, finalTargetChannel.permission.get(), ChatChannelManager.CHANNEL_PERMISSION_LEVEL)) {
                             if (effectiveRange >= 0) {
                                 double distSqr = Verbatim.gameContext.getDistanceSquared(recipient, sender);
@@ -290,11 +321,21 @@ public class ChatEventHandler {
                                         .orElseGet(() -> distSqr <= (long) effectiveRange * effectiveRange ? finalMessage : null);
 
                                     if (messageToSend != null) {
-                                        Verbatim.gameContext.sendMessage(recipient, messageToSend);
+                                        boolean isFav = SocialService.isFavorited(recipient, sender.getUUID());
+                                        if (isFav && favMessage != null) {
+                                            Verbatim.gameContext.sendMessage(recipient, favMessage);
+                                        } else {
+                                            Verbatim.gameContext.sendMessage(recipient, messageToSend);
+                                        }
                                     }
                                 }
                             } else {
-                                Verbatim.gameContext.sendMessage(recipient, finalMessage);
+                                boolean isFav = !recipient.equals(sender) && SocialService.isFavorited(recipient, sender.getUUID());
+                                if (isFav && favMessage != null) {
+                                    Verbatim.gameContext.sendMessage(recipient, favMessage);
+                                } else {
+                                    Verbatim.gameContext.sendMessage(recipient, finalMessage);
+                                }
                             }
                         } else {
                             ChatChannelManager.autoLeaveChannel(recipient, finalTargetChannel.name);
