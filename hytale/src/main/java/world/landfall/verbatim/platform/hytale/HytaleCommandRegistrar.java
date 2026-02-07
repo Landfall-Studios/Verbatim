@@ -529,6 +529,82 @@ public class HytaleCommandRegistrar {
         }
     }
 
+    // === Mail Commands ===
+
+    public static class MailCommand extends AbstractCommandCollection {
+        public MailCommand() {
+            super("mail", "Offline mail system");
+            addSubCommand(new MailSendSubCommand());
+            addSubCommand(new MailReadSubCommand());
+            addSubCommand(new MailClearSubCommand());
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+    }
+
+    public static class MailSendSubCommand extends AbstractPlayerCommand {
+        private final RequiredArg<String> targetArg;
+
+        public MailSendSubCommand() {
+            super("send", "Send mail to a player");
+            targetArg = withRequiredArg("player", "The player to mail", ArgTypes.STRING);
+            setAllowsExtraArguments(true);
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
+        protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
+                @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+            HytaleGamePlayer sender = new HytaleGamePlayer(playerRef);
+            String targetName = ctx.get(targetArg);
+            String message = extractMessageAfterToken(ctx.getInputString(), targetName);
+            VerbatimCommandHandlers.executeMailSend(sender, targetName, message);
+        }
+    }
+
+    public static class MailReadSubCommand extends AbstractPlayerCommand {
+        public MailReadSubCommand() {
+            super("read", "Read your mail");
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
+        protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
+                @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+            HytaleGamePlayer player = new HytaleGamePlayer(playerRef);
+            VerbatimCommandHandlers.executeMailRead(player);
+        }
+    }
+
+    public static class MailClearSubCommand extends AbstractPlayerCommand {
+        public MailClearSubCommand() {
+            super("clear", "Clear all your mail");
+        }
+
+        @Override
+        protected boolean canGeneratePermission() {
+            return false;
+        }
+
+        @Override
+        protected void execute(@Nonnull CommandContext ctx, @Nonnull Store<EntityStore> store,
+                @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
+            HytaleGamePlayer player = new HytaleGamePlayer(playerRef);
+            VerbatimCommandHandlers.executeMailClear(player);
+        }
+    }
+
     // === Helpers ===
 
     private static HytaleGameCommandSource wrapSource(CommandContext ctx, PlayerRef playerRef) {

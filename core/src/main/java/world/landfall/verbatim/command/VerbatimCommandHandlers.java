@@ -2,6 +2,7 @@ package world.landfall.verbatim.command;
 
 import world.landfall.verbatim.ChatChannelManager;
 import world.landfall.verbatim.Verbatim;
+import world.landfall.verbatim.util.MailService;
 import world.landfall.verbatim.util.NicknameService;
 import world.landfall.verbatim.util.SocialService;
 import world.landfall.verbatim.util.FormattingCodeUtils;
@@ -500,6 +501,150 @@ public class VerbatimCommandHandlers {
         }
 
         Verbatim.gameContext.sendMessage(player, message);
+        return 1;
+    }
+
+    // === Mail Commands ===
+
+    public static int executeMailSend(GamePlayer sender, String targetName, String message) {
+        if (message == null || message.trim().isEmpty()) {
+            Verbatim.gameContext.sendMessage(sender, text("Usage: /mail send <player> <message>").withColor(GameColor.RED));
+            return 0;
+        }
+
+        // Resolve target: try online first, then name cache
+        UUID targetUUID = null;
+        String resolvedName = targetName;
+
+        GamePlayer onlineTarget = Verbatim.gameContext.getPlayerByName(targetName);
+        if (onlineTarget != null) {
+            targetUUID = onlineTarget.getUUID();
+            resolvedName = onlineTarget.getUsername();
+        } else {
+            targetUUID = MailService.resolvePlayerUUID(targetName);
+        }
+
+        if (targetUUID == null) {
+            Verbatim.gameContext.sendMessage(sender, text("Player '").withColor(GameColor.RED)
+                .append(text(targetName).withColor(GameColor.WHITE))
+                .append(text("' not found. They must have logged in at least once.").withColor(GameColor.RED)));
+            return 0;
+        }
+
+        if (targetUUID.equals(sender.getUUID())) {
+            Verbatim.gameContext.sendMessage(sender, text("You cannot send mail to yourself.").withColor(GameColor.RED));
+            return 0;
+        }
+
+        // Ignore checks (mirroring DM behavior)
+        if (SocialService.isIgnoring(sender, targetUUID)) {
+            Verbatim.gameContext.sendMessage(sender, text("You have this player ignored. Unignore them to send mail.").withColor(GameColor.RED));
+            return 0;
+        }
+        if (onlineTarget != null && SocialService.isIgnoring(onlineTarget, sender.getUUID())) {
+            Verbatim.gameContext.sendMessage(sender, text("Cannot send mail to this player.").withColor(GameColor.RED));
+            if (SocialService.shouldNotifyBlock(onlineTarget.getUUID(), sender.getUUID())) {
+                Verbatim.gameContext.sendMessage(onlineTarget, text("Blocked mail from ").withColor(GameColor.GRAY)
+                    .append(text(sender.getUsername()).withColor(GameColor.YELLOW))
+                    .append(text(" (ignored).").withColor(GameColor.GRAY)));
+            }
+            return 0;
+        }
+
+        boolean sent = MailService.sendMail(sender.getUUID(), sender.getUsername(), targetUUID, message.trim());
+        if (!sent) {
+            Verbatim.gameContext.sendMessage(sender, text("That player's mailbox is full (" + MailService.MAX_MAILBOX_SIZE + " messages max).").withColor(GameColor.RED));
+            return 0;
+        }
+
+        Verbatim.gameContext.sendMessage(sender, text("Mail sent to ").withColor(GameColor.GREEN)
+            .append(text(resolvedName).withColor(GameColor.WHITE))
+            .append(text(".").withColor(GameColor.GREEN)));
+
+        // Notify target if online
+        if (onlineTarget != null) {
+            Verbatim.gameContext.sendMessage(onlineTarget,
+                Verbatim.gameContext.createInfoPrefix()
+                    .append(text("You have new mail from ").withColor(GameColor.YELLOW))
+                    .append(text(sender.getUsername()).withColor(GameColor.WHITE))
+                    .append(text(". Type ").withColor(GameColor.YELLOW))
+                    .append(text("/mail read").withColor(GameColor.AQUA))
+                    .append(text(" to view.").withColor(GameColor.YELLOW)));
+        }
+
+        return 1;
+    }
+
+    public static int executeMailRead(GamePlayer player) {
+        List<MailService.MailMessage> mail = MailService.getMail(player.getUUID());
+        if (mail.isEmpty()) {
+            Verbatim.gameContext.sendMessage(player, text("Your mailbox is empty.").withColor(GameColor.YELLOW));
+            return 1;
+        }
+
+        GameComponent message = text("Your Mail (" + mail.size() + "):").withColor(GameColor.GOLD);
+
+        SimpleDateFormat sdf = new SimpleDateFormat("MMM d, yyyy h:mm a");
+
+        // Show unread first, then read
+        List<MailService.MailMessage> unread = new ArrayList<>();
+        List<MailService.MailMessage> readMail = new ArrayList<>();
+        for (MailService.MailMessage msg : mail) {
+            if (!msg.read) unread.add(msg);
+            else readMail.add(msg);
+        }
+
+        for (MailService.MailMessage msg : unread) {
+            message = message.append(text("\n ").append(text("[NEW] ").withColor(GameColor.GREEN)))
+                .append(text(msg.senderName).withColor(GameColor.WHITE))
+                .append(text(" (" + sdf.format(new Date(msg.timestamp)) + "): ").withColor(GameColor.GRAY))
+                .append(text(msg.message).withColor(GameColor.YELLOW));
+        }
+        for (MailService.MailMessage msg : readMail) {
+            message = message.append(text("\n  "))
+                .append(text(msg.senderName).withColor(GameColor.GRAY))
+                .append(text(" (" + sdf.format(new Date(msg.timestamp)) + "): ").withColor(GameColor.DARK_GRAY))
+                .append(text(msg.message).withColor(GameColor.GRAY));
+        }
+
+        Verbatim.gameContext.sendMessage(player, message);
+        MailService.markAllRead(player.getUUID());
+        return 1;
+    }
+
+    public static int executeMailClear(GamePlayer player) {
+        List<MailService.MailMessage> mail = MailService.getMail(player.getUUID());
+        if (mail.isEmpty()) {
+            Verbatim.gameContext.sendMessage(player, text("Your mailbox is already empty.").withColor(GameColor.YELLOW));
+            return 1;
+        }
+        MailService.clearMail(player.getUUID());
+        Verbatim.gameContext.sendMessage(player, text("Mail cleared.").withColor(GameColor.GREEN));
+        return 1;
+    }
+
+    public static int executeMailHelp(GameCommandSource source) {
+        int unreadCount = 0;
+        Optional<GamePlayer> playerOpt = source.asPlayer();
+        if (playerOpt.isPresent()) {
+            unreadCount = MailService.getUnreadCount(playerOpt.get().getUUID());
+        }
+
+        GameComponent helpMessage = text("Mail Commands:\n").withColor(GameColor.GOLD)
+            .append(text("/mail send <player> <message>").withColor(GameColor.AQUA))
+            .append(text(" - Send mail to a player (online or offline).\n").withColor(GameColor.GRAY))
+            .append(text("/mail read").withColor(GameColor.AQUA))
+            .append(text(" - Read your mail.\n").withColor(GameColor.GRAY))
+            .append(text("/mail clear").withColor(GameColor.AQUA))
+            .append(text(" - Clear all your mail.\n").withColor(GameColor.GRAY));
+
+        if (playerOpt.isPresent() && unreadCount > 0) {
+            helpMessage = helpMessage.append(text("\nYou have ").withColor(GameColor.YELLOW))
+                .append(text(String.valueOf(unreadCount)).withColor(GameColor.GOLD))
+                .append(text(" unread message" + (unreadCount != 1 ? "s" : "") + ".").withColor(GameColor.YELLOW));
+        }
+
+        Verbatim.gameContext.sendCommandSuccess(source, helpMessage, false);
         return 1;
     }
 }

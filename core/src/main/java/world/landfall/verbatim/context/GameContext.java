@@ -1,5 +1,6 @@
 package world.landfall.verbatim.context;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.UUID;
 
@@ -127,6 +128,14 @@ public interface GameContext {
      * Sends a failure message in response to a command.
      */
     void sendCommandFailure(GameCommandSource source, GameComponent message);
+
+    // === Data Directory ===
+
+    /**
+     * Gets the platform-specific data directory for Verbatim.
+     * Used by services like MailService to store persistent files.
+     */
+    Path getDataDirectory();
 
     // === Discord Integration ===
 

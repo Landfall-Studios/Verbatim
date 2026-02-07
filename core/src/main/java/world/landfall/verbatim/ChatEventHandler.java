@@ -7,6 +7,7 @@ import world.landfall.verbatim.context.GameComponent;
 import world.landfall.verbatim.context.GamePlayer;
 import world.landfall.verbatim.specialchannels.FormattedMessageDetails;
 import world.landfall.verbatim.discord.DiscordBot;
+import world.landfall.verbatim.util.MailService;
 import world.landfall.verbatim.util.NicknameService;
 import world.landfall.verbatim.util.SocialService;
 import static world.landfall.verbatim.context.GameText.*;
@@ -81,6 +82,19 @@ public class ChatEventHandler {
                             .append(Verbatim.gameContext.createText(" " + jc.name).withColor(GameColor.DARK_AQUA)));
                 });
             }
+        }
+
+        // Register player name in mail service cache and show unread mail notification
+        MailService.registerPlayerName(player.getUUID(), player.getUsername());
+        int unreadMail = MailService.getUnreadCount(player.getUUID());
+        if (unreadMail > 0) {
+            Verbatim.gameContext.sendMessage(player,
+                Verbatim.gameContext.createInfoPrefix()
+                    .append(Verbatim.gameContext.createText("You have ").withColor(GameColor.YELLOW))
+                    .append(Verbatim.gameContext.createText(String.valueOf(unreadMail)).withColor(GameColor.GOLD))
+                    .append(Verbatim.gameContext.createText(" unread mail message" + (unreadMail != 1 ? "s" : "") + ". Type ").withColor(GameColor.YELLOW))
+                    .append(Verbatim.gameContext.createText("/mail read").withColor(GameColor.AQUA))
+                    .append(Verbatim.gameContext.createText(" to view.").withColor(GameColor.YELLOW)));
         }
     }
 

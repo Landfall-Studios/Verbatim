@@ -238,6 +238,70 @@ public class NeoForgeCommandRegistrar {
             );
         dispatcher.register(chKickCommand);
 
+        // /ignore command
+        LiteralArgumentBuilder<CommandSourceStack> ignoreCommand = Commands.literal("ignore")
+            .then(Commands.literal("add")
+                .then(Commands.argument("player", EntityArgument.player())
+                    .executes(context -> {
+                        if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
+                            Verbatim.gameContext.sendCommandFailure(wrapSource(context.getSource()), text("Players only."));
+                            return 0;
+                        }
+                        ServerPlayer target = EntityArgument.getPlayer(context, "player");
+                        return VerbatimCommandHandlers.executeIgnoreAdd(new NeoForgeGamePlayer(player), new NeoForgeGamePlayer(target));
+                    })))
+            .then(Commands.literal("remove")
+                .then(Commands.argument("player", StringArgumentType.word())
+                    .executes(context -> {
+                        if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
+                            Verbatim.gameContext.sendCommandFailure(wrapSource(context.getSource()), text("Players only."));
+                            return 0;
+                        }
+                        String targetName = StringArgumentType.getString(context, "player");
+                        return VerbatimCommandHandlers.executeIgnoreRemove(new NeoForgeGamePlayer(player), targetName);
+                    })))
+            .then(Commands.literal("list")
+                .executes(context -> {
+                    if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
+                        Verbatim.gameContext.sendCommandFailure(wrapSource(context.getSource()), text("Players only."));
+                        return 0;
+                    }
+                    return VerbatimCommandHandlers.executeIgnoreList(new NeoForgeGamePlayer(player));
+                }));
+        dispatcher.register(ignoreCommand);
+
+        // /fav command
+        LiteralArgumentBuilder<CommandSourceStack> favCommand = Commands.literal("fav")
+            .then(Commands.literal("add")
+                .then(Commands.argument("player", EntityArgument.player())
+                    .executes(context -> {
+                        if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
+                            Verbatim.gameContext.sendCommandFailure(wrapSource(context.getSource()), text("Players only."));
+                            return 0;
+                        }
+                        ServerPlayer target = EntityArgument.getPlayer(context, "player");
+                        return VerbatimCommandHandlers.executeFavAdd(new NeoForgeGamePlayer(player), new NeoForgeGamePlayer(target));
+                    })))
+            .then(Commands.literal("remove")
+                .then(Commands.argument("player", StringArgumentType.word())
+                    .executes(context -> {
+                        if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
+                            Verbatim.gameContext.sendCommandFailure(wrapSource(context.getSource()), text("Players only."));
+                            return 0;
+                        }
+                        String targetName = StringArgumentType.getString(context, "player");
+                        return VerbatimCommandHandlers.executeFavRemove(new NeoForgeGamePlayer(player), targetName);
+                    })))
+            .then(Commands.literal("list")
+                .executes(context -> {
+                    if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
+                        Verbatim.gameContext.sendCommandFailure(wrapSource(context.getSource()), text("Players only."));
+                        return 0;
+                    }
+                    return VerbatimCommandHandlers.executeFavList(new NeoForgeGamePlayer(player));
+                }));
+        dispatcher.register(favCommand);
+
         // /nick command
         LiteralArgumentBuilder<CommandSourceStack> nickCommand = Commands.literal("nick")
             .requires(source -> {
@@ -271,6 +335,40 @@ public class NeoForgeCommandRegistrar {
                 return VerbatimCommandHandlers.executeNickShow(new NeoForgeGamePlayer(player));
             });
         dispatcher.register(nickCommand);
+
+        // /mail command
+        LiteralArgumentBuilder<CommandSourceStack> mailCommand = Commands.literal("mail")
+            .then(Commands.literal("send")
+                .then(Commands.argument("player", StringArgumentType.word())
+                    .then(Commands.argument("message", StringArgumentType.greedyString())
+                        .executes(context -> {
+                            if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
+                                Verbatim.gameContext.sendCommandFailure(wrapSource(context.getSource()), text("Players only."));
+                                return 0;
+                            }
+                            String targetName = StringArgumentType.getString(context, "player");
+                            String message = StringArgumentType.getString(context, "message");
+                            return VerbatimCommandHandlers.executeMailSend(new NeoForgeGamePlayer(player), targetName, message);
+                        }))))
+            .then(Commands.literal("read")
+                .executes(context -> {
+                    if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
+                        Verbatim.gameContext.sendCommandFailure(wrapSource(context.getSource()), text("Players only."));
+                        return 0;
+                    }
+                    return VerbatimCommandHandlers.executeMailRead(new NeoForgeGamePlayer(player));
+                }))
+            .then(Commands.literal("clear")
+                .executes(context -> {
+                    if (!(context.getSource().getEntity() instanceof ServerPlayer player)) {
+                        Verbatim.gameContext.sendCommandFailure(wrapSource(context.getSource()), text("Players only."));
+                        return 0;
+                    }
+                    return VerbatimCommandHandlers.executeMailClear(new NeoForgeGamePlayer(player));
+                }))
+            .executes(context -> VerbatimCommandHandlers.executeMailHelp(wrapSource(context.getSource())));
+        dispatcher.register(mailCommand);
+        dispatcher.register(Commands.literal(Verbatim.MODID + "mail").redirect(mailCommand.build()));
     }
 
     private static NeoForgeGameCommandSource wrapSource(CommandSourceStack source) {

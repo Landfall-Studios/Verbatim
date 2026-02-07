@@ -13,6 +13,9 @@ import net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent;
 import world.landfall.verbatim.ChatChannelManager;
 import world.landfall.verbatim.Verbatim;
 import world.landfall.verbatim.discord.DiscordBot;
+import world.landfall.verbatim.util.MailService;
+
+import java.nio.file.Path;
 import org.apache.logging.log4j.core.config.Configurator;
 import org.apache.logging.log4j.Level;
 
@@ -51,6 +54,12 @@ public class NeoForgeEntryPoint {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         Verbatim.LOGGER.info("Server is starting!");
+
+        // Set data directory and initialize mail service
+        Path dataDir = event.getServer().getServerDirectory().resolve("verbatim");
+        ((NeoForgeGameContextImpl) Verbatim.gameContext).setDataDirectory(dataDir);
+        MailService.init(dataDir);
+
         Verbatim.LOGGER.info("Loading chat channel configurations...");
         ChatChannelManager.loadConfiguredChannels();
 
@@ -63,7 +72,9 @@ public class NeoForgeEntryPoint {
 
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
-        Verbatim.LOGGER.info("Server is stopping! Shutting down Discord Bot...");
+        Verbatim.LOGGER.info("Server is stopping!");
+        MailService.shutdown();
+        Verbatim.LOGGER.info("Shutting down Discord Bot...");
         DiscordBot.shutdown();
     }
 }

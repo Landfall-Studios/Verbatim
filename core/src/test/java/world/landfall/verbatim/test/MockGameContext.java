@@ -2,6 +2,7 @@ package world.landfall.verbatim.test;
 
 import world.landfall.verbatim.context.*;
 
+import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -184,6 +185,15 @@ public class MockGameContext implements GameContext {
         source.asPlayer().ifPresent(player ->
             sentMessages.add(new SentMessage(player, message))
         );
+    }
+
+    @Override
+    public Path getDataDirectory() {
+        try {
+            return java.nio.file.Files.createTempDirectory("verbatim-test");
+        } catch (java.io.IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override

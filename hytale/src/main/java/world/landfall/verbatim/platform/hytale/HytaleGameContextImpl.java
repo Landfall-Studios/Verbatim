@@ -10,6 +10,7 @@ import world.landfall.verbatim.context.GameComponent;
 import world.landfall.verbatim.context.GameContext;
 import world.landfall.verbatim.context.GamePlayer;
 
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -34,6 +35,9 @@ public class HytaleGameContextImpl implements GameContext {
     /** Per-player file store for crash-resilient persistence. */
     private PlayerFileStore fileStore;
 
+    /** Data directory for Verbatim plugin files. */
+    private Path dataDirectory;
+
     /** Tracks online player UUIDs to their last known usernames (for file saves). */
     private final ConcurrentHashMap<UUID, String> onlinePlayerUsernames = new ConcurrentHashMap<>();
 
@@ -52,6 +56,18 @@ public class HytaleGameContextImpl implements GameContext {
      */
     public void setFileStore(PlayerFileStore fileStore) {
         this.fileStore = fileStore;
+    }
+
+    /**
+     * Sets the data directory for this context.
+     */
+    public void setDataDirectory(Path dataDirectory) {
+        this.dataDirectory = dataDirectory;
+    }
+
+    @Override
+    public Path getDataDirectory() {
+        return dataDirectory;
     }
 
     // === Server Operations ===

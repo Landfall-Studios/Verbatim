@@ -10,6 +10,7 @@ import world.landfall.verbatim.context.GameComponent;
 import world.landfall.verbatim.context.GameContext;
 import world.landfall.verbatim.context.GamePlayer;
 
+import java.nio.file.Path;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
@@ -20,8 +21,19 @@ import java.util.stream.Collectors;
  */
 public class NeoForgeGameContextImpl implements GameContext {
 
+    private Path dataDirectory;
+
     private MinecraftServer getServer() {
         return ServerLifecycleHooks.getCurrentServer();
+    }
+
+    public void setDataDirectory(Path dataDirectory) {
+        this.dataDirectory = dataDirectory;
+    }
+
+    @Override
+    public Path getDataDirectory() {
+        return dataDirectory;
     }
 
     /**

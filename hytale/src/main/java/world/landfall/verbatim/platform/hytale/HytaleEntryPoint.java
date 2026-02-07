@@ -8,6 +8,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import world.landfall.verbatim.ChatChannelManager;
 import world.landfall.verbatim.Verbatim;
 import world.landfall.verbatim.discord.DiscordBot;
+import world.landfall.verbatim.util.MailService;
 
 import javax.annotation.Nonnull;
 import java.io.File;
@@ -49,6 +50,7 @@ public class HytaleEntryPoint extends JavaPlugin {
         // Initialize the game context and wire the file store
         gameContextImpl = new HytaleGameContextImpl();
         gameContextImpl.setFileStore(fileStore);
+        gameContextImpl.setDataDirectory(dataDir.toPath());
 
         // Wire all platform-independent services via the service locator
         Verbatim.gameContext = gameContextImpl;
@@ -57,6 +59,9 @@ public class HytaleEntryPoint extends JavaPlugin {
         Verbatim.channelFormatter = new HytaleLocalChannelFormatter();
         Verbatim.permissionService = new HytalePermissionService();
         Verbatim.prefixService = new HytalePrefixService();
+
+        // Initialize mail service
+        MailService.init(dataDir.toPath());
 
         // Register chat and player events
         this.getEventRegistry().registerGlobal(PlayerReadyEvent.class, HytaleChatEvents::onPlayerReady);
@@ -82,8 +87,10 @@ public class HytaleEntryPoint extends JavaPlugin {
         // Social (ignore & favorites)
         this.getCommandRegistry().registerCommand(new HytaleCommandRegistrar.IgnoreCommand());
         this.getCommandRegistry().registerCommand(new HytaleCommandRegistrar.FavCommand());
+        // Mail
+        this.getCommandRegistry().registerCommand(new HytaleCommandRegistrar.MailCommand());
 
-        Verbatim.LOGGER.info("[Verbatim] Plugin setup complete. Commands registered: /channel, /channels, /msg (/tell), /r, /list, /vlist, /chlist, /chkick, /nick, /ignore, /fav");
+        Verbatim.LOGGER.info("[Verbatim] Plugin setup complete. Commands registered: /channel, /channels, /msg (/tell), /r, /list, /vlist, /chlist, /chkick, /nick, /ignore, /fav, /mail");
     }
 
     @Override
@@ -124,6 +131,9 @@ public class HytaleEntryPoint extends JavaPlugin {
             Verbatim.LOGGER.debug("[Verbatim] Pre-shutdown save for player: {}", player.getUsername());
             ChatChannelManager.playerLoggedOut(player);
         }
+
+        // Shut down mail service
+        MailService.shutdown();
 
         // Shut down Discord bot
         DiscordBot.shutdown();
