@@ -100,6 +100,22 @@ public interface GameContext {
      */
     GameComponent createEmpty();
 
+    // === Platform-Specific Symbols ===
+
+    /**
+     * Creates an info/notification prefix component.
+     * Minecraft: 🗨️ (speech balloon emoji)
+     * Hytale: [!] in light purple
+     */
+    GameComponent createInfoPrefix();
+
+    /**
+     * Creates a warning prefix component.
+     * Minecraft: ⚠ (warning emoji)
+     * Hytale: [!] in gold
+     */
+    GameComponent createWarningPrefix();
+
     // === Command Response ===
 
     /**

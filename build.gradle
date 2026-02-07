@@ -1,138 +1,86 @@
 plugins {
-    id 'java-library'
-    id 'maven-publish'
-    id 'idea'
-    id 'net.neoforged.moddev' version '2.0.88'
+    id 'java'
+    id 'com.gradleup.shadow' version '9.3.1'
 }
 
-version = mod_version
 group = mod_group_id
+version = mod_version
+
+base {
+    archivesName = "${mod_id}-Hytale"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(java_version)
+    withSourcesJar()
+}
 
 repositories {
     mavenLocal()
     mavenCentral()
 }
 
-base {
-    archivesName = "${mod_id}-${minecraft_version}-NeoForge"
-}
-
-java.toolchain.languageVersion = JavaLanguageVersion.of(21)
-
-neoForge {
-    version = project.neo_version
-
-    parchment {
-        mappingsVersion = project.parchment_mappings_version
-        minecraftVersion = project.parchment_minecraft_version
-    }
-
-    runs {
-        client {
-            client()
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        }
-
-        server {
-            server()
-            programArgument '--nogui'
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        }
-
-        gameTestServer {
-            type = "gameTestServer"
-            systemProperty 'neoforge.enabledGameTestNamespaces', project.mod_id
-        }
-
-        data {
-            data()
-            programArguments.addAll '--mod', project.mod_id, '--all', '--output', file('src/generated/resources/').getAbsolutePath(), '--existing', file('src/main/resources/').getAbsolutePath()
-        }
-
-        configureEach {
-            systemProperty 'forge.logging.markers', 'REGISTRIES'
-            logLevel = org.slf4j.event.Level.DEBUG
-        }
-    }
-
-    mods {
-        "${mod_id}" {
-            sourceSet(sourceSets.main)
-        }
-    }
-}
-
-sourceSets.main.resources { srcDir 'src/generated/resources' }
-
-configurations.all {
-    resolutionStrategy {
-        force 'org.slf4j:slf4j-api:2.0.7'
-    }
-}
-
 dependencies {
+    // Hytale Server API (provided by server at runtime)
+    // Set hytale_server_jar in gradle.properties to your HytaleServer.jar path
+    compileOnly(files(hytale_server_jar))
+
+    // LuckPerms (accessed via reflection, compile-only reference)
     compileOnly 'net.luckperms:api:5.4'
-    
-    annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
-    
-    // Explicit SLF4J dependency (NeoForge should provide this, but having it ensures API availability for your code)
+
+    // SLF4J (bundled - Hytale's plugin classloader doesn't expose server's SLF4J)
     implementation 'org.slf4j:slf4j-api:2.0.7'
-    
-    // JDA dependency - transitive dependencies will be resolved automatically for compilation
+    implementation 'org.slf4j:slf4j-simple:2.0.7'
+
+    // JDA (bundled with shadow - Discord integration)
     implementation 'net.dv8tion:JDA:5.0.0-beta.24'
 
-    // Configure JarJar to bundle and relocate JDA and its necessary runtime dependencies
-    jarJar('net.dv8tion:JDA:5.0.0-beta.24') {
-        exclude group: 'org.slf4j' // Exclude SLF4J as NeoForge provides it
+    // Gson (bundled with shadow - config serialization)
+    implementation 'com.google.code.gson:gson:2.10.1'
+
+    // Testing
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks {
+    compileJava {
+        options.encoding = 'UTF-8'
+        options.release = Integer.parseInt(java_version)
     }
-    jarJar('com.squareup.okhttp3:okhttp:4.12.0')
-    jarJar('com.squareup.okio:okio-jvm:3.2.0')
-    jarJar('org.jetbrains.kotlin:kotlin-stdlib:1.9.10')
-    jarJar('com.neovisionaries:nv-websocket-client:2.14')
-    jarJar('net.sf.trove4j:trove4j:3.0.3')
-    jarJar('com.fasterxml.jackson.core:jackson-core:2.15.2')
-    jarJar('com.fasterxml.jackson.core:jackson-databind:2.15.2')
-    jarJar('com.fasterxml.jackson.core:jackson-annotations:2.15.2')
-    jarJar('org.apache.commons:commons-collections4:4.4')
-}
 
-var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {
-    var replaceProperties = [minecraft_version      : minecraft_version,
-                             minecraft_version_range: minecraft_version_range,
-                             neo_version            : neo_version,
-                             neo_version_range      : neo_version_range,
-                             loader_version_range   : loader_version_range,
-                             mod_id                 : mod_id,
-                             mod_name               : mod_name,
-                             mod_license            : mod_license,
-                             mod_version            : mod_version,
-                             mod_authors            : mod_authors,
-                             mod_description        : mod_description]
-    inputs.properties replaceProperties
-    expand replaceProperties
-    from "src/main/templates"
-    into "build/generated/sources/modMetadata"
-}
+    processResources {
+        filteringCharset = 'UTF-8'
 
-sourceSets.main.resources.srcDir generateModMetadata
-neoForge.ideSyncTask generateModMetadata
+        def replaceProperties = [
+            group      : project.group,
+            version    : project.version,
+            description: mod_description
+        ]
+        inputs.properties replaceProperties
 
-publishing {
-    publications {
-        register('mavenJava', MavenPublication) {
-            from components.java
+        filesMatching('manifest.json') {
+            expand replaceProperties
         }
     }
-    repositories {
-        maven {
-            url "file://${project.projectDir}/repo"
+
+    shadowJar {
+        archiveBaseName.set(rootProject.name)
+        archiveClassifier.set('')
+
+        // Relocate bundled dependencies to avoid classpath conflicts
+        relocate 'net.dv8tion.jda', 'world.landfall.verbatim.libs.jda'
+        relocate 'com.google.gson', 'world.landfall.verbatim.libs.gson'
+        relocate 'com.neovisionaries.ws', 'world.landfall.verbatim.libs.ws'
+        relocate 'okhttp3', 'world.landfall.verbatim.libs.okhttp3'
+        relocate 'okio', 'world.landfall.verbatim.libs.okio'
+
+        minimize {
+            exclude(dependency('org.slf4j:.*'))
         }
     }
-}
 
-idea {
-    module {
-        downloadSources = true
-        downloadJavadoc = true
+    build {
+        dependsOn shadowJar
     }
 }

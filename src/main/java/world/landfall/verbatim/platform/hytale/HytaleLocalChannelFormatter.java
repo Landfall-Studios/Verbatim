@@ -1,26 +1,24 @@
-package world.landfall.verbatim.platform.neoforge;
+package world.landfall.verbatim.platform.hytale;
 
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.Component;
-import net.minecraft.network.chat.MutableComponent;
-import net.minecraft.network.chat.Style;
+import com.hypixel.hytale.server.core.Message;
+
+import java.awt.Color;
 import world.landfall.verbatim.ChatChannelManager;
 import world.landfall.verbatim.Verbatim;
 import world.landfall.verbatim.context.GameComponent;
-// NeoForgeGameComponentImpl is in this package
 import world.landfall.verbatim.context.GamePlayer;
 import world.landfall.verbatim.specialchannels.ChannelFormatter;
 import world.landfall.verbatim.specialchannels.FormattedMessageDetails;
 
-import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 
 /**
- * NeoForge implementation of ChannelFormatter.
- * Handles formatting for "local" special channels with suffix-based behavior.
+ * Hytale implementation of ChannelFormatter.
+ * Handles formatting for "local" special channels with suffix-based behavior
+ * (shouts, whispers, OOC, roleplay) using Hytale's Message API.
  */
-public class NeoForgeLocalChannelFormatter implements ChannelFormatter {
+public class HytaleLocalChannelFormatter implements ChannelFormatter {
     private static final Random RANDOM = new Random();
     private static final int MAX_FADE_DISTANCE = 15;
     private static final String OBSCURE_CHARS = ".";
@@ -52,33 +50,21 @@ public class NeoForgeLocalChannelFormatter implements ChannelFormatter {
         double obscurePercentage = (distance - effectiveRange) / fadeDistance;
         obscurePercentage = Math.min(1.0, Math.max(0.0, obscurePercentage));
 
-        MutableComponent originalMc = ((NeoForgeGameComponentImpl) originalMessage).toMinecraftMutable();
-        List<Component> originalSiblings = originalMc.getSiblings();
-        if (originalSiblings.isEmpty()) {
-            return originalMessage.copy();
-        }
+        // For Hytale, we work at the string level since Message is immutable
+        String originalText = originalMessage.getString();
+        Message result = Message.raw("");
 
-        MutableComponent reconstructedMessage = Component.empty();
-        int firstMessageContentComponentIndex = originalSiblings.size() - 1;
-
-        for (int i = 0; i < firstMessageContentComponentIndex; i++) {
-            reconstructedMessage.append(originalSiblings.get(i).copy());
-        }
-
-        for (int i = firstMessageContentComponentIndex; i < originalSiblings.size(); i++) {
-            Component messagePartComponent = originalSiblings.get(i);
-            String textToObscure = messagePartComponent.getString();
-
-            for (char c : textToObscure.toCharArray()) {
-                if (RANDOM.nextDouble() < obscurePercentage) {
-                    reconstructedMessage.append(Component.literal(String.valueOf(OBSCURE_CHARS.charAt(RANDOM.nextInt(OBSCURE_CHARS.length()))))
-                        .withStyle(ChatFormatting.DARK_GRAY));
-                } else {
-                    reconstructedMessage.append(((NeoForgeGameComponentImpl) Verbatim.chatFormatter.parseColors(channelMessageColorString + c)).toMinecraft());
-                }
+        for (char c : originalText.toCharArray()) {
+            if (RANDOM.nextDouble() < obscurePercentage) {
+                result = Message.join(result,
+                    Message.raw(String.valueOf(OBSCURE_CHARS.charAt(RANDOM.nextInt(OBSCURE_CHARS.length()))))
+                        .color(new Color(0x555555)));
+            } else {
+                result = Message.join(result,
+                    ((HytaleGameComponentImpl) Verbatim.chatFormatter.parseColors(channelMessageColorString + c)).toHytale());
             }
         }
-        return NeoForgeGameComponentImpl.wrap(reconstructedMessage);
+        return HytaleGameComponentImpl.wrap(result);
     }
 
     @Override
@@ -133,69 +119,65 @@ public class NeoForgeLocalChannelFormatter implements ChannelFormatter {
             applyPlusStyleFormatting = false;
             messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 2);
 
-            MutableComponent finalMessage = Component.empty();
-            finalMessage.append(Component.literal("[OOC] ").withStyle(ChatFormatting.DARK_GRAY));
-
             String playerName = sender.getUsername();
             String displayName = sender.getDisplayName();
 
-            finalMessage.append(Component.literal(playerName + " (" + displayName + "): ").withStyle(ChatFormatting.DARK_GRAY));
-            finalMessage.append(((NeoForgeGameComponentImpl) Verbatim.chatFormatter.parseColors("&8" + messageAfterSuffixRemoval.trim())).toMinecraft());
+            Message finalMessage = Message.join(
+                Message.raw("[OOC] ").color(new Color(0x555555)),
+                Message.raw(playerName + " (" + displayName + "): ").color(new Color(0x555555)),
+                ((HytaleGameComponentImpl) Verbatim.chatFormatter.parseColors("&8" + messageAfterSuffixRemoval.trim())).toHytale()
+            );
 
-            return Optional.of(new FormattedMessageDetails(NeoForgeGameComponentImpl.wrap(finalMessage), effectiveRange, false, "&8"));
+            return Optional.of(new FormattedMessageDetails(HytaleGameComponentImpl.wrap(finalMessage), effectiveRange, false, "&8"));
         }
 
         actualMessageContent = messageAfterSuffixRemoval.trim();
 
-        MutableComponent finalMessage = Component.empty();
-
-        finalMessage.append(((NeoForgeGameComponentImpl) Verbatim.chatFormatter.parseColors(channelConfig.displayPrefix)).toMinecraft());
-        finalMessage.append(Component.literal(" "));
-
-        Component playerNameComponent = ((NeoForgeGameComponentImpl) Verbatim.chatFormatter.createPlayerNameComponent(sender, channelConfig.nameColor, false, channelConfig.nameStyle)).toMinecraft();
-        finalMessage.append(playerNameComponent);
+        Message finalMessage = Message.join(
+            ((HytaleGameComponentImpl) Verbatim.chatFormatter.parseColors(channelConfig.displayPrefix)).toHytale(),
+            Message.raw(" "),
+            ((HytaleGameComponentImpl) Verbatim.chatFormatter.createPlayerNameComponent(sender, channelConfig.nameColor, false, channelConfig.nameStyle)).toHytale()
+        );
 
         boolean skipSpaceAfterName = applyPlusStyleFormatting && actualMessageContent.startsWith("'");
 
         if (!skipSpaceAfterName) {
-            finalMessage.append(Component.literal(" "));
+            finalMessage = Message.join(finalMessage, Message.raw(" "));
         }
 
         if (!localActionText.isEmpty()) {
-            finalMessage.append(Component.literal(localActionText));
-            finalMessage.append(Component.literal(" "));
+            finalMessage = Message.join(finalMessage, Message.raw(localActionText), Message.raw(" "));
         }
 
         if (applyPlusStyleFormatting) {
-            formatPlusStyleMessage(finalMessage, actualMessageContent, channelConfig.messageColor);
-            return Optional.of(new FormattedMessageDetails(NeoForgeGameComponentImpl.wrap(finalMessage), effectiveRange, true, null));
+            finalMessage = Message.join(finalMessage, formatPlusStyleMessage(actualMessageContent));
+            return Optional.of(new FormattedMessageDetails(HytaleGameComponentImpl.wrap(finalMessage), effectiveRange, true, null));
         } else {
-            finalMessage.append(((NeoForgeGameComponentImpl) Verbatim.chatFormatter.parseColors(channelConfig.messageColor + actualMessageContent)).toMinecraft());
-            return Optional.of(new FormattedMessageDetails(NeoForgeGameComponentImpl.wrap(finalMessage), effectiveRange, false, channelConfig.messageColor));
+            finalMessage = Message.join(finalMessage,
+                ((HytaleGameComponentImpl) Verbatim.chatFormatter.parseColors(channelConfig.messageColor + actualMessageContent)).toHytale());
+            return Optional.of(new FormattedMessageDetails(HytaleGameComponentImpl.wrap(finalMessage), effectiveRange, false, channelConfig.messageColor));
         }
     }
 
-    private void formatPlusStyleMessage(MutableComponent finalMessage, String messageContent, String baseColorPrefix) {
+    private Message formatPlusStyleMessage(String messageContent) {
         boolean inQuote = false;
         StringBuilder currentSegment = new StringBuilder();
+        Message result = Message.raw("");
 
-        Style grayStyle = Style.EMPTY.withColor(ChatFormatting.GRAY);
-        Style whiteItalicStyle = Style.EMPTY.withColor(ChatFormatting.WHITE).withItalic(true);
-
-        NeoForgeChatFormatter chatFormatter = (NeoForgeChatFormatter) Verbatim.chatFormatter;
+        HytaleChatFormatter chatFormatter = (HytaleChatFormatter) Verbatim.chatFormatter;
 
         for (int i = 0; i < messageContent.length(); i++) {
             char c = messageContent.charAt(i);
             if (c == '"') {
                 if (currentSegment.length() > 0) {
                     if (inQuote) {
-                        finalMessage.append(chatFormatter.makeLinksClickableInternal(currentSegment.toString(), grayStyle));
+                        result = Message.join(result, chatFormatter.makeLinksClickableInternal(currentSegment.toString(), new Color(0xAAAAAA)));
                     } else {
-                        finalMessage.append(chatFormatter.makeLinksClickableInternal(currentSegment.toString(), whiteItalicStyle));
+                        result = Message.join(result, chatFormatter.makeLinksClickableInternal(currentSegment.toString(), Color.WHITE));
                     }
                     currentSegment.setLength(0);
                 }
-                finalMessage.append(Component.literal("\"").copy().withStyle(ChatFormatting.GRAY));
+                result = Message.join(result, Message.raw("\"").color(new Color(0xAAAAAA)));
                 inQuote = !inQuote;
             } else {
                 currentSegment.append(c);
@@ -204,10 +186,12 @@ public class NeoForgeLocalChannelFormatter implements ChannelFormatter {
 
         if (currentSegment.length() > 0) {
             if (inQuote) {
-                finalMessage.append(chatFormatter.makeLinksClickableInternal(currentSegment.toString(), grayStyle));
+                result = Message.join(result, chatFormatter.makeLinksClickableInternal(currentSegment.toString(), new Color(0xAAAAAA)));
             } else {
-                finalMessage.append(chatFormatter.makeLinksClickableInternal(currentSegment.toString(), whiteItalicStyle));
+                result = Message.join(result, chatFormatter.makeLinksClickableInternal(currentSegment.toString(), Color.WHITE));
             }
         }
+
+        return result;
     }
 }

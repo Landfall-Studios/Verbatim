@@ -1,0 +1,6 @@
+{
+  "Group": "Landfall",
+  "Name": "Verbatim",
+  "Version": "${version}",
+  "Main": "world.landfall.verbatim.platform.hytale.HytaleEntryPoint"
+}

@@ -176,7 +176,8 @@ public class ChatChannelManager {
                 internalJoinChannel(player, config.name, true);
 
                 if (!wasJoined && config.mature) {
-                    Verbatim.gameContext.sendMessage(player, text("\u26A0 WARNING: This channel may contain mature content!").withColor(GameColor.GOLD).withBold(true));
+                    Verbatim.gameContext.sendMessage(player, Verbatim.gameContext.createWarningPrefix()
+                        .append(text("WARNING: This channel may contain mature content!").withColor(GameColor.GOLD).withBold(true)));
                     Verbatim.gameContext.sendMessage(player, text("By remaining in this channel, you confirm that you are 18+ and okay with seeing messages posted here.").withColor(GameColor.YELLOW));
                     Verbatim.gameContext.sendMessage(player, text("If you are not comfortable with this, please leave immediately using: ").withColor(GameColor.YELLOW)
                         .append(text("/channel leave").withColor(GameColor.WHITE).withUnderlined(true)));
@@ -286,7 +287,8 @@ public class ChatChannelManager {
                 .append(Verbatim.chatFormatter.parseColors(config.displayPrefix + " " + config.name)));
 
             if (config.mature) {
-                Verbatim.gameContext.sendMessage(player, text("\u26A0 WARNING: This channel may contain mature content. \u26A0").withColor(GameColor.GOLD).withBold(true));
+                Verbatim.gameContext.sendMessage(player, Verbatim.gameContext.createWarningPrefix()
+                    .append(text("WARNING: This channel may contain mature content.").withColor(GameColor.GOLD).withBold(true)));
                 Verbatim.gameContext.sendMessage(player, text("By remaining in this channel, you confirm that you are 18+ and okay with seeing messages posted here.").withColor(GameColor.YELLOW));
                 Verbatim.gameContext.sendMessage(player, text("If you are not comfortable with this, please leave immediately using: ").withColor(GameColor.YELLOW)
                     .append(text("/channel leave").withColor(GameColor.WHITE).withUnderlined(true)));
@@ -374,7 +376,8 @@ public class ChatChannelManager {
                 .append(Verbatim.chatFormatter.parseColors(config.displayPrefix + " " + config.name)));
 
             if (!wasJoined && config.mature) {
-                Verbatim.gameContext.sendMessage(player, text("\u26A0 WARNING: This channel may contain mature content. \u26A0").withColor(GameColor.GOLD).withBold(true));
+                Verbatim.gameContext.sendMessage(player, Verbatim.gameContext.createWarningPrefix()
+                    .append(text("WARNING: This channel may contain mature content.").withColor(GameColor.GOLD).withBold(true)));
                 Verbatim.gameContext.sendMessage(player, text("By remaining in this channel, you confirm that you are 18+ and okay with seeing messages posted here.").withColor(GameColor.YELLOW));
                 Verbatim.gameContext.sendMessage(player, text("If you are not comfortable with this, please leave immediately using: ").withColor(GameColor.YELLOW)
                     .append(text("/channel leave").withColor(GameColor.WHITE).withUnderlined(true)));

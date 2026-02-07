@@ -51,14 +51,16 @@ public class ChatEventHandler {
                 ChatChannelManager.ChannelConfig config = ChatChannelManager.getChannelConfigByName(((ChatFocus) focus).getChannelName()).orElse(null);
                 if (config != null) {
                     Verbatim.gameContext.sendMessage(player,
-                        Verbatim.gameContext.createText("\uD83D\uDDE8 Focused channel: ")
+                        Verbatim.gameContext.createInfoPrefix()
+                            .append(Verbatim.gameContext.createText("Focused channel: "))
                             .append(Verbatim.chatFormatter.parseColors(config.displayPrefix))
                             .append(Verbatim.gameContext.createText(" " + config.name).withColor(GameColor.YELLOW))
                     );
                 }
             } else if (focus instanceof ChatFocus && ((ChatFocus) focus).getType() == ChatFocus.FocusType.DM) {
                 Verbatim.gameContext.sendMessage(player,
-                    Verbatim.gameContext.createText("\uD83D\uDCAC Focused DM: ")
+                    Verbatim.gameContext.createInfoPrefix()
+                        .append(Verbatim.gameContext.createText("Focused DM: "))
                         .append(Verbatim.gameContext.createText(focus.getDisplayName()).withColor(GameColor.YELLOW))
                 );
             }
@@ -66,7 +68,8 @@ public class ChatEventHandler {
 
         Set<String> joinedChannels = ChatChannelManager.getJoinedChannels(player);
         if (!joinedChannels.isEmpty()) {
-            Verbatim.gameContext.sendMessage(player, Verbatim.gameContext.createText("\uD83D\uDCDE Joined channels: ").withColor(GameColor.GRAY));
+            Verbatim.gameContext.sendMessage(player, Verbatim.gameContext.createInfoPrefix()
+                .append(Verbatim.gameContext.createText("Joined channels: ").withColor(GameColor.GRAY)));
             for (String joinedChannelName : joinedChannels) {
                 ChatChannelManager.getChannelConfigByName(joinedChannelName).ifPresent(jc -> {
                     Verbatim.gameContext.sendMessage(player,
