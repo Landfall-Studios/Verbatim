@@ -1,8 +1,16 @@
-# Verbatim
+<p align="center">
+  <img src="ICON.png" alt="Verbatim" width="128" />
+</p>
 
-A cross-platform server-side chat channel system with configurable channels, direct messaging, distance-based local chat, and Discord integration.
+<h1 align="center">Verbatim</h1>
 
-For user-facing documentation (commands, configuration, permissions), see [USAGE.md](USAGE.md).
+<p align="center">
+  A cross-platform server-side chat channel system with configurable channels, direct messaging, distance-based local chat, and Discord integration.
+</p>
+
+<p align="center">
+  <a href="USAGE.md">Usage Guide</a>
+</p>
 
 ## Architecture
 
@@ -68,7 +76,7 @@ In `world.landfall.verbatim.specialchannels`:
 
 ## Platform Implementations
 
-### Hytale (`platform/hytale/`)
+### Hytale (`hytale/`)
 
 Built against the Hytale Server API (`com.hypixel.hytale.server`). Entry point: `HytaleEntryPoint extends JavaPlugin`.
 
@@ -89,9 +97,9 @@ Built against the Hytale Server API (`com.hypixel.hytale.server`). Entry point: 
 | `HytaleLoggerAdapter` | `Logger` (SLF4J) | Adapts Hytale's native logger via reflection |
 | `HytaleVerbatimConfig` | - | JSON config file management with defaults |
 
-### NeoForge / Minecraft (`platform/neoforge/`)
+### NeoForge / Minecraft (`neoforge/`)
 
-Built against NeoForge for Minecraft 1.21.1. Lives on the `1.21.1-NeoForge` branch.
+Built against NeoForge for Minecraft 1.21.1.
 
 | Class | Implements | Notes |
 |-------|-----------|-------|
@@ -128,35 +136,40 @@ Features unavailable in Hytale's `Message` API compared to Minecraft's `MutableC
 
 ## Building
 
+Each module is an independent Gradle project with its own wrapper. Build from within each directory:
+
+### Core (shared logic + tests)
+
+```bash
+cd core && ./gradlew build
+```
+
 ### Hytale
 
-Requires a local copy of `HytaleServer.jar`. Set the path in `gradle.properties`:
+Requires a local copy of `HytaleServer.jar`. Set the path in `hytale/gradle.properties`:
 
 ```properties
 hytale_server_jar=/path/to/HytaleServer.jar
 ```
 
 ```bash
-./gradlew build        # Produces shadow jar in build/libs/
-./gradlew compileJava  # Compile only
-./gradlew test         # Run unit tests
+cd hytale && ./gradlew build   # Produces shadow jar in build/libs/
 ```
 
 ### NeoForge
 
-Switch to the `1.21.1-NeoForge` branch. Uses NeoForge's Gradle toolchain:
-
 ```bash
-git checkout 1.21.1-NeoForge
-./gradlew build
+cd neoforge && ./gradlew build   # Produces mod jar with core via JarJar
 ```
 
 ## Adding a New Platform
 
-1. Create `platform/<name>/` package.
-2. Implement all interfaces: `GameContext`, `GamePlayer`, `GameCommandSource`, `GameComponent`, `ChatFormatter`, `ChannelFormatter`.
-3. Extend `PermissionService` and `PrefixService` (or use `NoPrefixService`).
-4. Implement `GameConfig` for your config format.
-5. Create an entry point that wires all implementations into the `Verbatim` service locator.
-6. Register event handlers that delegate to `ChatEventHandler`.
-7. Register commands that delegate to `VerbatimCommandHandlers`.
+1. Create a new directory (e.g., `forge-1.20.1/`) with its own `build.gradle`, `settings.gradle` (with `includeBuild '../core'`), and Gradle wrapper.
+2. Create `platform/<name>/` package under `src/main/java/world/landfall/verbatim/`.
+3. Implement all interfaces: `GameContext`, `GamePlayer`, `GameCommandSource`, `GameComponent`, `ChatFormatter`, `ChannelFormatter`.
+4. Extend `PermissionService` and `PrefixService` (or use `NoPrefixService`).
+5. Implement `GameConfig` for your config format.
+6. Create an entry point that wires all implementations into the `Verbatim` service locator.
+7. Register event handlers that delegate to `ChatEventHandler`.
+8. Register commands that delegate to `VerbatimCommandHandlers`.
+9. Add the new module to the root `settings.gradle` for IDE discovery.
