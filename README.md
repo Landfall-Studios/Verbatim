@@ -1,94 +1,162 @@
-# Verbatim - Advanced Chat Mod for Minecraft
+# Verbatim
 
-Verbatim is a Minecraft server-side mod designed to enhance in-game communication by providing configurable chat channels, direct messaging, Discord integration, and more. It aims to offer a flexible and powerful chat system suitable for various server types, especially those with roleplaying or community focus.
+A cross-platform server-side chat channel system with configurable channels, direct messaging, distance-based local chat, and Discord integration.
 
-## Features
+For user-facing documentation (commands, configuration, permissions), see [USAGE.md](USAGE.md).
 
-*   **Customizable Chat Channels:**
-    *   Define multiple chat channels with unique names, display prefixes (e.g., `&a[G]`), and shortcuts (e.g., `g`).
-    *   **Permissions:** Secure channels with permission nodes (integrates with LuckPerms if available, otherwise uses vanilla OP levels).
-    *   **Chat Range:** Set per-channel chat ranges (e.g., for local channels) or make them global.
-    *   **Color Customization:** Configure colors for channel names, player names, separators, and messages.
-    *   **Always-On Channels:** Designate channels that players are always in and cannot leave.
-    *   **Mature Content Warnings:** Option to display a warning when players join channels marked as "mature."
-    *   **Special Pre-Made Channel Types:**
-        *   `local`: Implements distance-based message fading/obscuring and supports different suffixes (e.g., `!!` for shouting, `*` for whispering) that affect message range and style. (Big shout-out to [MassiveChat](https://www.massivecraft.com/documentation/massivechat-aliases-quick-commands/) for this idea!)
-*   **Direct Messaging (DM) / Private Messaging (PM):**
-    *   Send private messages to other online players.
-    *   Quick reply functionality to the last incoming DM.
-*   **Chat Prefixes & Shortcuts:**
-    *   Use prefixes to quickly switch focus or send messages to specific channels/DMs without commands (e.g., `g: Hello everyone!` to send to and focus the 'global' channel).
-    *   `d:` prefix to focus/reply to the last DM.
-*   **Discord Integration:**
-    *   Bridge in-game chat (specifically a designated "global" channel) to a Discord channel.
-    *   Relay messages from Discord back into the game.
-    *   Customizable message prefix for Discord messages shown in-game.
-*   **Persistent Player Settings:**
-    *   Remembers which channels a player has joined and their focused channel across sessions.
-*   **Configuration:**
-    *   Extensive configuration via a TOML file (`verbatim-server.toml` in the server's `config` folder).
-    *   Define all channels, default channel, Discord bot token, channel ID, and other settings.
-*   **Admin Commands & Utilities:**
-    *   Reload configuration on the fly (typically requires OP/permission).
+## Architecture
 
-## Commands
+Verbatim uses a **service locator with adapter pattern** to run the same business logic across multiple game platforms. All shared logic depends on platform-independent interfaces; platform entry points wire concrete implementations at startup.
 
-Most commands are accessible via `/channel` or `/verbatim:channel`.
+### Service Locator
 
-*   `/channels` or `/channel list`
-    *   Lists all available chat channels and your current status in them.
-*   `/channel focus <channelName>`
-    *   Sets your active typing channel. This will also automatically join the channel if you aren't already in it (and have permission).
-*   `/channel join <channelName>`
-    *   Joins a specific channel to receive its messages.
-*   `/channel leave <channelName>`
-    *   Leaves a specific joined channel.
-*   `/channel leave`
-    *   Leaves your currently focused channel (if it's not an "always-on" channel).
-*   `/channel help`
-    *   Displays a help message with available Verbatim commands and chat prefixes.
+`Verbatim.java` holds static references to all platform services:
 
-**Direct Message Commands:**
+```
+Verbatim.gameContext        -> GameContext
+Verbatim.gameConfig         -> GameConfig
+Verbatim.chatFormatter      -> ChatFormatter
+Verbatim.channelFormatter   -> ChannelFormatter
+Verbatim.permissionService  -> PermissionService
+Verbatim.prefixService      -> PrefixService
+Verbatim.LOGGER             -> Logger (SLF4J)
+```
 
-*   `/msg <player> [message]` or `/tell <player> [message]`
-    *   Sends a direct message to the specified player. If no message is provided, it focuses your chat on that player for subsequent messages.
-*   `/r [message]`
-    *   Replies to the last player who sent you a direct message. If no message is provided, it focuses your chat on that player.
-*   `/w <player> [message]`
-    *   An alias for `/msg`.
+### Core Interfaces
 
-**Chat Prefixes (examples):**
+All in `world.landfall.verbatim.context`:
 
-*   `g: Your message here` - Sends "Your message here" to the channel with shortcut "g" and focuses it.
-*   `d: Your reply here` - Sends "Your reply here" to the last person who DM'd you and focuses DM with them.
-*   `d:` (with no message) - Focuses DM with the last person who DM'd you (same as `/r` with no message).
+| Interface | Purpose |
+|-----------|---------|
+| `GameContext` | Server operations, player retrieval, messaging, persistent data, permissions, component creation |
+| `GamePlayer` | Player abstraction (username, display name, UUID, name components) |
+| `GameComponent` | Styled text with color, bold, italic, underline, click/hover events |
+| `GameCommandSource` | Command executor abstraction with permission checks |
+| `ChatFormatter` | Color code parsing, player name formatting, link detection |
+| `GameConfig` | Configuration access (channels, Discord settings, join/leave messages) |
+| `GameColor` | Enum of 16 standard colors with formatting codes and RGB values |
+| `GameText` | Static helper (`text("Hello").withColor(GameColor.GREEN)`) |
 
-## Configuration
+### Service Base Classes
 
-Verbatim is configured through the `verbatim-server.toml` file, typically located in the `config` directory of your Minecraft server after the mod is run for the first time.
+In `world.landfall.verbatim.util`:
 
-Key areas to configure:
-*   `defaultChannelName`: The channel players will default to.
-*   `channels`: A list where each entry defines a chat channel's properties (name, prefix, shortcut, permission, range, colors, etc.).
-*   `Discord Integration`: Settings for the Discord bot, including bot token, channel ID, message prefix, and enabling/disabling the feature.
+| Class | Purpose |
+|-------|---------|
+| `PermissionService` | Abstract. LuckPerms -> native permissions -> permission level fallback chain |
+| `PrefixService` | Abstract. Player prefix/group data from LuckPerms. Includes `NoPrefixService` no-op default |
 
-## Permissions
+### Special Channels
 
-Verbatim attempts to use LuckPerms for permission checking if it's available on the server. If LuckPerms is not found, it falls back to vanilla Minecraft's operator (OP) levels.
+In `world.landfall.verbatim.specialchannels`:
 
-*   **Channel Access:** Channel permissions are defined in the `permission` field for each channel in the configuration file (e.g., `verbatim.channel.staff`). If a permission is set, players will need that node to join/speak in the channel (unless it's `alwaysOn`).
+| Class | Purpose |
+|-------|---------|
+| `ChannelFormatter` | Interface for local channel formatting and distance-based message obscuring |
+| `FormattedMessageDetails` | Data class holding formatted message, effective range, roleplay flag, and distance-based delivery logic |
 
-### LuckPerms Prefix and Tooltip Configuration
+### Shared Business Logic
 
-Verbatim supports displaying player prefixes and tooltips from LuckPerms metadata:
+| Class | Purpose |
+|-------|---------|
+| `ChatEventHandler` | Processes login/logout/chat events, routes messages to channels/DMs, handles distance delivery |
+| `ChatChannelManager` | Channel config loading, player membership tracking, focus management, persistent state |
+| `VerbatimCommandHandlers` | Platform-independent command implementations (`/channel`, `/msg`, `/nick`, etc.) |
+| `NicknameService` | Nickname storage, validation, and formatting code filtering |
+| `FormattingCodeUtils` | Utilities for stripping `&` formatting codes |
+| `DiscordBot` / `DiscordListener` | JDA-based Discord bridge |
 
-*   **Setting a Prefix:**
-    *   For users: `/lp user <username> meta setprefix <priority> "<prefix>"`
-    *   For groups: `/lp group <groupname> meta setprefix <priority> "<prefix>"`
-    *   Example: `/lp user Steve meta setprefix 100 "&c[Admin] "`
+## Platform Implementations
 
-*   **Setting a Prefix Tooltip:**
-    *   For users: `/lp user <username> meta set prefix_tooltip.0 "<tooltip text>"`
-    *   For groups: `/lp group <groupname> meta set prefix_tooltip.0 "<tooltip text>"`
-    *   Example: `/lp group admin meta set prefix_tooltip.0 "Server Administrator"`
-    *   Note: You can use `prefix_tooltip.0` through `prefix_tooltip.9` to set multiple tooltips with different priorities.
+### Hytale (`platform/hytale/`)
+
+Built against the Hytale Server API (`com.hypixel.hytale.server`). Entry point: `HytaleEntryPoint extends JavaPlugin`.
+
+| Class | Implements | Notes |
+|-------|-----------|-------|
+| `HytaleGameContextImpl` | `GameContext` | Uses `Universe` API. In-memory persistent data backed by JSON file |
+| `HytaleGameComponentImpl` | `GameComponent` | Wraps `Message`. See platform limitations below |
+| `HytaleGamePlayer` | `GamePlayer` | Wraps `PlayerRef` |
+| `HytaleGameCommandSource` | `GameCommandSource` | Wraps `CommandContext` + `PlayerRef` |
+| `HytaleChatFormatter` | `ChatFormatter` | Color/formatting via `Message` API. Links via `Message.link()` |
+| `HytaleLocalChannelFormatter` | `ChannelFormatter` | Distance obscuring with `Message.join()` for prefix preservation |
+| `HytalePermissionService` | `PermissionService` | LuckPerms (reflection) -> `PermissionsModule` -> permission level fallback |
+| `HytalePrefixService` | `PrefixService` | LuckPerms (reflection) for prefix/group data |
+| `HytaleGameConfig` | `GameConfig` | Delegates to `HytaleVerbatimConfig` (JSON-based) |
+| `HytaleCommandRegistrar` | - | Command registration using `AbstractPlayerCommand` / `AbstractCommandCollection` |
+| `HytaleChatEvents` | - | Bridges Hytale events to `ChatEventHandler` |
+| `HytaleColorBridge` | - | `GameColor` -> `java.awt.Color` conversion |
+| `HytaleLoggerAdapter` | `Logger` (SLF4J) | Adapts Hytale's native logger via reflection |
+| `HytaleVerbatimConfig` | - | JSON config file management with defaults |
+
+### NeoForge / Minecraft (`platform/neoforge/`)
+
+Built against NeoForge for Minecraft 1.21.1. Lives on the `1.21.1-NeoForge` branch.
+
+| Class | Implements | Notes |
+|-------|-----------|-------|
+| `NeoForgeGameContextImpl` | `GameContext` | Uses `MinecraftServer` API. NBT-based persistent data |
+| `NeoForgeGameComponentImpl` | `GameComponent` | Wraps `MutableComponent`. Full hover/click event support |
+| `NeoForgeGamePlayer` | `GamePlayer` | Wraps `ServerPlayer` |
+| `NeoForgeChatFormatter` | `ChatFormatter` | Full Minecraft `Style` support including hover tooltips on links/names |
+| `NeoForgeLocalChannelFormatter` | `ChannelFormatter` | Distance obscuring via `MutableComponent.getSiblings()` |
+| `NeoForgePermissionService` | `PermissionService` | LuckPerms (reflection) -> vanilla OP level fallback |
+| `NeoForgePrefixService` | `PrefixService` | LuckPerms (reflection) for prefix/group data |
+
+## Hytale Platform Limitations
+
+Features unavailable in Hytale's `Message` API compared to Minecraft's `MutableComponent`:
+
+| Feature | Minecraft | Hytale | Impact |
+|---------|-----------|--------|--------|
+| Hover tooltips | Full support | Not in protocol | No hover text on player names, links, or prefixes |
+| Click: suggest command | `ClickEvent.Action.SUGGEST_COMMAND` | Not available | Cannot click player names to suggest `/msg` |
+| Click: run command | `ClickEvent.Action.RUN_COMMAND` | Not available | Cannot click to run commands |
+| Click: copy to clipboard | `ClickEvent.Action.COPY_TO_CLIPBOARD` | Not available | - |
+| Click: open URL | `ClickEvent.Action.OPEN_URL` | `Message.link(url)` | Supported |
+| Strikethrough | `Style.withStrikethrough()` | Not in `Message` API | `&m` code ignored |
+| Obfuscated | `Style.withObfuscated()` | Not in `Message` API | `&k` code ignored |
+| Underline | `Style.withUnderlined()` | In `FormattedMessage` protocol but not exposed in `Message` API | `&n` code ignored |
+
+### Behavioral Differences
+
+- **Formatting codes and `&r`:** Only `&r` resets bold/italic/color. Color codes (`&a`, `&c`, etc.) change color without resetting bold or italic. This is intentional and differs from vanilla Minecraft behavior where color codes reset all formatting.
+- **`broadcastMessage`:** The `bypassHiddenPlayers` flag is ignored on Hytale; all online players receive broadcasts.
+- **LuckPerms access:** Both platforms use reflection to access LuckPerms. Hytale's `loadUser()` calls have a 2-second timeout; NeoForge's do not.
+- **Persistent data:** Hytale uses an in-memory `ConcurrentHashMap` persisted to a JSON file on shutdown. NeoForge uses Minecraft's NBT `PersistentData` which saves incrementally.
+- **Hytale command parsing:** Hytale's `ArgTypes.STRING` captures only a single word. Multi-word arguments (e.g., `/msg Player hello world`) are extracted from `CommandContext.getInputString()` via helper methods in `HytaleCommandRegistrar`.
+
+## Building
+
+### Hytale
+
+Requires a local copy of `HytaleServer.jar`. Set the path in `gradle.properties`:
+
+```properties
+hytale_server_jar=/path/to/HytaleServer.jar
+```
+
+```bash
+./gradlew build        # Produces shadow jar in build/libs/
+./gradlew compileJava  # Compile only
+./gradlew test         # Run unit tests
+```
+
+### NeoForge
+
+Switch to the `1.21.1-NeoForge` branch. Uses NeoForge's Gradle toolchain:
+
+```bash
+git checkout 1.21.1-NeoForge
+./gradlew build
+```
+
+## Adding a New Platform
+
+1. Create `platform/<name>/` package.
+2. Implement all interfaces: `GameContext`, `GamePlayer`, `GameCommandSource`, `GameComponent`, `ChatFormatter`, `ChannelFormatter`.
+3. Extend `PermissionService` and `PrefixService` (or use `NoPrefixService`).
+4. Implement `GameConfig` for your config format.
+5. Create an entry point that wires all implementations into the `Verbatim` service locator.
+6. Register event handlers that delegate to `ChatEventHandler`.
+7. Register commands that delegate to `VerbatimCommandHandlers`.

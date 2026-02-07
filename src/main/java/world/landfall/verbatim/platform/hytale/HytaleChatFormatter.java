@@ -51,18 +51,27 @@ public class HytaleChatFormatter implements ChatFormatter {
     }
 
     /**
-     * Makes links in text clickable using Hytale's link tag system.
-     * Returns a Message with clickable URLs.
+     * Applies color, bold, and italic styling to a Message segment.
      */
-    public Message makeLinksClickableInternal(String text, Color baseColor) {
+    private static Message applyStyle(Message msg, Color color, boolean bold, boolean italic) {
+        if (color != null) msg = msg.color(color);
+        if (bold) msg = msg.bold(true);
+        if (italic) msg = msg.italic(true);
+        return msg;
+    }
+
+    /**
+     * Makes links in text clickable using Hytale's link tag system.
+     * Returns a Message with clickable URLs and applied styling.
+     */
+    public Message makeLinksClickableInternal(String text, Color baseColor, boolean bold, boolean italic) {
         if (text == null || text.isEmpty()) {
             return Message.raw("");
         }
 
         Matcher matcher = URL_PATTERN.matcher(text);
         if (!matcher.find()) {
-            Message msg = Message.raw(text);
-            return baseColor != null ? msg.color(baseColor) : msg;
+            return applyStyle(Message.raw(text), baseColor, bold, italic);
         }
 
         matcher.reset();
@@ -72,15 +81,15 @@ public class HytaleChatFormatter implements ChatFormatter {
         while (matcher.find()) {
             if (matcher.start() > lastEnd) {
                 String beforeUrl = text.substring(lastEnd, matcher.start());
-                Message part = Message.raw(beforeUrl);
-                result = Message.join(result, baseColor != null ? part.color(baseColor) : part);
+                result = Message.join(result, applyStyle(Message.raw(beforeUrl), baseColor, bold, italic));
             }
 
             String url = matcher.group();
             String clickUrl = url.toLowerCase().startsWith("www.") ? "https://" + url : url;
 
             // Hytale supports clickable links via the Message API
-            Message urlComponent = Message.raw(url).color(new Color(0x5555FF));
+            Message urlComponent = applyStyle(Message.raw(url), new Color(0x5555FF), bold, italic)
+                .link(clickUrl);
             result = Message.join(result, urlComponent);
 
             lastEnd = matcher.end();
@@ -88,17 +97,31 @@ public class HytaleChatFormatter implements ChatFormatter {
 
         if (lastEnd < text.length()) {
             String remaining = text.substring(lastEnd);
-            Message part = Message.raw(remaining);
-            result = Message.join(result, baseColor != null ? part.color(baseColor) : part);
+            result = Message.join(result, applyStyle(Message.raw(remaining), baseColor, bold, italic));
         }
 
         return result;
     }
 
+    /**
+     * Overload for callers that don't need bold/italic.
+     */
+    public Message makeLinksClickableInternal(String text, Color baseColor) {
+        return makeLinksClickableInternal(text, baseColor, false, false);
+    }
+
     @Override
     public GameComponent makeLinksClickable(String text, GameComponent baseStyleComponent) {
         Color baseColor = null;
-        // Extract color context from the base component if possible
+        if (baseStyleComponent instanceof HytaleGameComponentImpl impl) {
+            String colorStr = impl.toHytale().getColor();
+            if (colorStr != null && !colorStr.isEmpty()) {
+                try {
+                    baseColor = Color.decode(colorStr);
+                } catch (NumberFormatException ignored) {
+                }
+            }
+        }
         return HytaleGameComponentImpl.wrap(makeLinksClickableInternal(text, baseColor));
     }
 
@@ -111,28 +134,35 @@ public class HytaleChatFormatter implements ChatFormatter {
         Message result = Message.raw("");
         String[] parts = text.split("(?i)(?=&[0-9a-fk-or])");
         Color currentColor = null;
+        boolean currentBold = false;
+        boolean currentItalic = false;
 
         for (String part : parts) {
             if (part.isEmpty()) continue;
 
             if (part.startsWith("&") && part.length() >= 2) {
-                char code = part.charAt(1);
+                char code = Character.toLowerCase(part.charAt(1));
                 String textContent = part.substring(2);
 
                 Color color = codeToColor(code);
                 if (color != null) {
                     currentColor = color;
-                } else if (Character.toLowerCase(code) == 'r') {
+                } else if (code == 'l') {
+                    currentBold = true;
+                } else if (code == 'o') {
+                    currentItalic = true;
+                } else if (code == 'r') {
                     currentColor = null;
+                    currentBold = false;
+                    currentItalic = false;
                 }
-                // Formatting codes (k, l, m, n, o) are handled as no-ops for color;
-                // Hytale's Message API handles bold/italic through TinyMessage tags
+                // &k (obfuscated), &m (strikethrough), &n (underline) not available in Hytale
 
                 if (!textContent.isEmpty()) {
-                    result = Message.join(result, makeLinksClickableInternal(textContent, currentColor));
+                    result = Message.join(result, makeLinksClickableInternal(textContent, currentColor, currentBold, currentItalic));
                 }
             } else {
-                result = Message.join(result, makeLinksClickableInternal(part, currentColor));
+                result = Message.join(result, makeLinksClickableInternal(part, currentColor, currentBold, currentItalic));
             }
         }
         return HytaleGameComponentImpl.wrap(result);
@@ -150,30 +180,35 @@ public class HytaleChatFormatter implements ChatFormatter {
         Message result = Message.raw("");
         String[] parts = text.split("(?i)(?=&[0-9a-fk-or])");
         Color currentColor = null;
+        boolean currentBold = false;
+        boolean currentItalic = false;
 
         for (String part : parts) {
             if (part.isEmpty()) continue;
 
             if (part.startsWith("&") && part.length() >= 2) {
-                char code = part.charAt(1);
+                char code = Character.toLowerCase(part.charAt(1));
                 String content = part.substring(2);
 
                 Color color = codeToColor(code);
-                boolean isFormatCode = "klmno".indexOf(Character.toLowerCase(code)) >= 0;
-                boolean isReset = Character.toLowerCase(code) == 'r';
 
                 if (color != null && hasColorPerm) {
                     currentColor = color;
-                } else if (isReset && (hasColorPerm || hasFormatPerm)) {
+                } else if (code == 'l' && hasFormatPerm) {
+                    currentBold = true;
+                } else if (code == 'o' && hasFormatPerm) {
+                    currentItalic = true;
+                } else if (code == 'r' && (hasColorPerm || hasFormatPerm)) {
                     currentColor = null;
+                    currentBold = false;
+                    currentItalic = false;
                 }
-                // Format codes are no-ops in Hytale Message unless we use TinyMessage
 
                 if (!content.isEmpty()) {
-                    result = Message.join(result, makeLinksClickableInternal(content, currentColor));
+                    result = Message.join(result, makeLinksClickableInternal(content, currentColor, currentBold, currentItalic));
                 }
             } else {
-                result = Message.join(result, makeLinksClickableInternal(part, currentColor));
+                result = Message.join(result, makeLinksClickableInternal(part, currentColor, currentBold, currentItalic));
             }
         }
         return HytaleGameComponentImpl.wrap(result);
@@ -205,28 +240,35 @@ public class HytaleChatFormatter implements ChatFormatter {
         Message result = Message.raw("");
         String[] parts = playerInput.split("(?i)(?=&[0-9a-fk-or])");
         Color currentColor = baseColor;
+        boolean currentBold = false;
+        boolean currentItalic = false;
 
         for (String part : parts) {
             if (part.isEmpty()) continue;
 
             if (part.startsWith("&") && part.length() >= 2) {
-                char code = part.charAt(1);
+                char code = Character.toLowerCase(part.charAt(1));
                 String content = part.substring(2);
 
                 Color color = codeToColor(code);
-                boolean isReset = Character.toLowerCase(code) == 'r';
 
                 if (color != null && hasColorPerm) {
                     currentColor = color;
-                } else if (isReset && (hasColorPerm || hasFormatPerm)) {
+                } else if (code == 'l' && hasFormatPerm) {
+                    currentBold = true;
+                } else if (code == 'o' && hasFormatPerm) {
+                    currentItalic = true;
+                } else if (code == 'r' && (hasColorPerm || hasFormatPerm)) {
                     currentColor = baseColor;
+                    currentBold = false;
+                    currentItalic = false;
                 }
 
                 if (!content.isEmpty()) {
-                    result = Message.join(result, makeLinksClickableInternal(content, currentColor));
+                    result = Message.join(result, makeLinksClickableInternal(content, currentColor, currentBold, currentItalic));
                 }
             } else {
-                result = Message.join(result, makeLinksClickableInternal(part, currentColor));
+                result = Message.join(result, makeLinksClickableInternal(part, currentColor, currentBold, currentItalic));
             }
         }
 

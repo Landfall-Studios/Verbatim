@@ -10,6 +10,7 @@ import world.landfall.verbatim.context.GamePlayer;
 import world.landfall.verbatim.specialchannels.ChannelFormatter;
 import world.landfall.verbatim.specialchannels.FormattedMessageDetails;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.Random;
 
@@ -20,7 +21,7 @@ import java.util.Random;
  */
 public class HytaleLocalChannelFormatter implements ChannelFormatter {
     private static final Random RANDOM = new Random();
-    private static final int MAX_FADE_DISTANCE = 15;
+    private static final int MAX_FADE_DISTANCE = 30;
     private static final String OBSCURE_CHARS = ".";
 
     @Override
@@ -42,29 +43,70 @@ public class HytaleLocalChannelFormatter implements ChannelFormatter {
 
         double fadeDistance;
         if (effectiveRange <= 15) {
-            fadeDistance = effectiveRange * 1.5;
+            fadeDistance = effectiveRange * 2.0;
         } else {
-            fadeDistance = Math.min(MAX_FADE_DISTANCE, effectiveRange * 0.3);
+            fadeDistance = Math.min(MAX_FADE_DISTANCE, effectiveRange * 0.6);
         }
 
         double obscurePercentage = (distance - effectiveRange) / fadeDistance;
         obscurePercentage = Math.min(1.0, Math.max(0.0, obscurePercentage));
 
-        // For Hytale, we work at the string level since Message is immutable
-        String originalText = originalMessage.getString();
+        // Like the Minecraft version: use getChildren() to find the message structure,
+        // keep all prefix components (channel tag, player name, verb) intact,
+        // and only obscure the last child (the actual message content).
+        Message hytaleMsg = ((HytaleGameComponentImpl) originalMessage).toHytale();
+        List<Message> children = hytaleMsg.getChildren();
+
+        if (children == null || children.isEmpty()) {
+            return originalMessage.copy();
+        }
+
+        int lastIndex = children.size() - 1;
         Message result = Message.raw("");
 
-        for (char c : originalText.toCharArray()) {
-            if (RANDOM.nextDouble() < obscurePercentage) {
-                result = Message.join(result,
-                    Message.raw(String.valueOf(OBSCURE_CHARS.charAt(RANDOM.nextInt(OBSCURE_CHARS.length()))))
-                        .color(new Color(0x555555)));
-            } else {
-                result = Message.join(result,
-                    ((HytaleGameComponentImpl) Verbatim.chatFormatter.parseColors(channelMessageColorString + c)).toHytale());
+        // Preserve prefix components
+        for (int i = 0; i < lastIndex; i++) {
+            result = Message.join(result, children.get(i));
+        }
+
+        // Obscure only the message content (last child)
+        String textToObscure = extractText(children.get(lastIndex));
+        if (textToObscure == null || textToObscure.isEmpty()) {
+            result = Message.join(result, children.get(lastIndex));
+        } else {
+            for (char c : textToObscure.toCharArray()) {
+                if (RANDOM.nextDouble() < obscurePercentage) {
+                    result = Message.join(result,
+                        Message.raw(String.valueOf(OBSCURE_CHARS.charAt(RANDOM.nextInt(OBSCURE_CHARS.length()))))
+                            .color(new Color(0x555555)));
+                } else {
+                    result = Message.join(result,
+                        ((HytaleGameComponentImpl) Verbatim.chatFormatter.parseColors(channelMessageColorString + c)).toHytale());
+                }
             }
         }
         return HytaleGameComponentImpl.wrap(result);
+    }
+
+    /**
+     * Recursively extracts plain text from a Message and its children.
+     */
+    private static String extractText(Message msg) {
+        StringBuilder sb = new StringBuilder();
+        String raw = msg.getRawText();
+        if (raw != null) {
+            sb.append(raw);
+        }
+        List<Message> children = msg.getChildren();
+        if (children != null) {
+            for (Message child : children) {
+                String childText = extractText(child);
+                if (childText != null) {
+                    sb.append(childText);
+                }
+            }
+        }
+        return sb.length() > 0 ? sb.toString() : null;
     }
 
     @Override
@@ -173,7 +215,7 @@ public class HytaleLocalChannelFormatter implements ChannelFormatter {
                     if (inQuote) {
                         result = Message.join(result, chatFormatter.makeLinksClickableInternal(currentSegment.toString(), new Color(0xAAAAAA)));
                     } else {
-                        result = Message.join(result, chatFormatter.makeLinksClickableInternal(currentSegment.toString(), Color.WHITE));
+                        result = Message.join(result, chatFormatter.makeLinksClickableInternal(currentSegment.toString(), Color.WHITE, false, true));
                     }
                     currentSegment.setLength(0);
                 }
@@ -188,7 +230,7 @@ public class HytaleLocalChannelFormatter implements ChannelFormatter {
             if (inQuote) {
                 result = Message.join(result, chatFormatter.makeLinksClickableInternal(currentSegment.toString(), new Color(0xAAAAAA)));
             } else {
-                result = Message.join(result, chatFormatter.makeLinksClickableInternal(currentSegment.toString(), Color.WHITE));
+                result = Message.join(result, chatFormatter.makeLinksClickableInternal(currentSegment.toString(), Color.WHITE, false, true));
             }
         }
 

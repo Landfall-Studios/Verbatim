@@ -244,15 +244,18 @@ public class HytaleGameContextImpl implements GameContext {
             return true;
         }
         // Hytale uses string-based permissions. For OP-level compatibility,
-        // we check a generic admin permission node.
-        // The PermissionService with LuckPerms will handle this in most cases.
+        // we check a generic admin permission node via PermissionsModule.
         PlayerRef ref = unwrap(player);
         try {
-            // Check if the player has the admin permission through the context system
-            return false; // Default to false; LuckPerms fallback handles this
+            com.hypixel.hytale.server.core.permissions.PermissionsModule permissions =
+                com.hypixel.hytale.server.core.permissions.PermissionsModule.get();
+            if (permissions != null) {
+                return permissions.hasPermission(ref.getUuid(), "verbatim.admin");
+            }
         } catch (Exception e) {
-            return false;
+            // PermissionsModule not available
         }
+        return false;
     }
 
     // === Component Creation ===

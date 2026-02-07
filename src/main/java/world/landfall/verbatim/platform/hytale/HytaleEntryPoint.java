@@ -8,7 +8,6 @@ import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import world.landfall.verbatim.ChatChannelManager;
 import world.landfall.verbatim.Verbatim;
 import world.landfall.verbatim.discord.DiscordBot;
-import world.landfall.verbatim.util.PrefixService.NoPrefixService;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -64,7 +63,7 @@ public class HytaleEntryPoint extends JavaPlugin {
         Verbatim.chatFormatter = new HytaleChatFormatter();
         Verbatim.channelFormatter = new HytaleLocalChannelFormatter();
         Verbatim.permissionService = new HytalePermissionService();
-        Verbatim.prefixService = new NoPrefixService();
+        Verbatim.prefixService = new HytalePrefixService();
 
         // Register chat and player events
         this.getEventRegistry().registerGlobal(PlayerReadyEvent.class, HytaleChatEvents::onPlayerReady);
@@ -88,7 +87,7 @@ public class HytaleEntryPoint extends JavaPlugin {
         // Nicknames
         this.getCommandRegistry().registerCommand(new HytaleCommandRegistrar.NickCommand());
 
-        Verbatim.LOGGER.info("[Verbatim] Plugin setup complete. Commands registered: /channel, /channels, /msg, /r, /list, /vlist, /chlist, /chkick, /nick");
+        Verbatim.LOGGER.info("[Verbatim] Plugin setup complete. Commands registered: /channel, /channels, /msg (/tell), /r, /list, /vlist, /chlist, /chkick, /nick");
     }
 
     @Override

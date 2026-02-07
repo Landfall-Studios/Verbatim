@@ -139,7 +139,29 @@ public class HytaleGameComponentImpl implements GameComponent {
 
     @Override
     public String getString() {
-        return wrapped.getRawText();
+        String raw = wrapped.getRawText();
+        if (raw != null) return raw;
+        // getRawText() returns null for compound/joined messages;
+        // recursively extract text from children
+        return extractText(wrapped);
+    }
+
+    private static String extractText(Message msg) {
+        StringBuilder sb = new StringBuilder();
+        String raw = msg.getRawText();
+        if (raw != null) {
+            sb.append(raw);
+        }
+        java.util.List<Message> children = msg.getChildren();
+        if (children != null) {
+            for (Message child : children) {
+                String childText = extractText(child);
+                if (childText != null) {
+                    sb.append(childText);
+                }
+            }
+        }
+        return sb.length() > 0 ? sb.toString() : null;
     }
 
     @Override

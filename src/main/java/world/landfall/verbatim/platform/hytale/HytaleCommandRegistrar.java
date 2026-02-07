@@ -10,7 +10,6 @@ import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import world.landfall.verbatim.ChatChannelManager;
@@ -176,12 +175,11 @@ public class HytaleCommandRegistrar {
 
     public static class MsgCommand extends AbstractPlayerCommand {
         private final RequiredArg<PlayerRef> targetArg;
-        private final OptionalArg<String> messageArg;
 
         public MsgCommand() {
             super("msg", "Send a direct message to a player");
+            addAliases("tell");
             targetArg = withRequiredArg("player", "The player to message", ArgTypes.PLAYER_REF);
-            messageArg = withOptionalArg("message", "The message to send", ArgTypes.STRING);
             setAllowsExtraArguments(true);
         }
 
@@ -198,22 +196,22 @@ public class HytaleCommandRegistrar {
 
             var targetPlayer = new HytaleGamePlayer(targetRef);
 
-            if (!messageArg.provided(ctx)) {
+            // Extract message from raw input since ArgTypes.STRING only captures one word
+            String message = extractMessageAfterToken(ctx.getInputString(), targetPlayer.getUsername());
+
+            if (message == null) {
                 // Just focus DM, no message
                 ChatChannelManager.focusDm(sender, targetPlayer.getUUID());
             } else {
-                String message = ctx.get(messageArg);
                 VerbatimCommandHandlers.sendDirectMessage(sender, targetPlayer, message);
             }
         }
     }
 
     public static class ReplyCommand extends AbstractPlayerCommand {
-        private final OptionalArg<String> messageArg;
 
         public ReplyCommand() {
             super("r", "Reply to the last player who messaged you");
-            messageArg = withOptionalArg("message", "The message to send", ArgTypes.STRING);
             setAllowsExtraArguments(true);
         }
 
@@ -227,10 +225,12 @@ public class HytaleCommandRegistrar {
                 @Nonnull Ref<EntityStore> ref, @Nonnull PlayerRef playerRef, @Nonnull World world) {
             HytaleGamePlayer sender = new HytaleGamePlayer(playerRef);
 
-            if (!messageArg.provided(ctx)) {
+            // Extract message from raw input since ArgTypes.STRING only captures one word
+            String message = extractMessageAfterCommand(ctx.getInputString());
+
+            if (message == null) {
                 ChatChannelManager.handleDPrefix(sender);
             } else {
-                String message = ctx.get(messageArg);
                 VerbatimCommandHandlers.replyToLastDm(sender, message);
             }
         }
@@ -339,11 +339,9 @@ public class HytaleCommandRegistrar {
     // === Nickname Commands ===
 
     public static class NickCommand extends AbstractPlayerCommand {
-        private final OptionalArg<String> nicknameArg;
 
         public NickCommand() {
             super("nick", "Set, show, or clear your nickname");
-            nicknameArg = withOptionalArg("nickname", "The nickname to set, or 'clear' to remove", ArgTypes.STRING);
             setAllowsExtraArguments(true);
         }
 
@@ -362,22 +360,61 @@ public class HytaleCommandRegistrar {
                 return;
             }
 
-            if (!nicknameArg.provided(ctx)) {
-                VerbatimCommandHandlers.executeNickShow(gamePlayer);
+            // Extract nickname from raw input since ArgTypes.STRING only captures one word
+            String nickname = extractMessageAfterCommand(ctx.getInputString());
+
+            if (nickname == null) {
+                VerbatimCommandHandlers.executeNickClear(gamePlayer);
             } else {
-                String nickname = ctx.get(nicknameArg);
-                if ("clear".equalsIgnoreCase(nickname)) {
-                    VerbatimCommandHandlers.executeNickClear(gamePlayer);
-                } else {
-                    VerbatimCommandHandlers.executeNickSet(gamePlayer, nickname);
-                }
+                VerbatimCommandHandlers.executeNickSet(gamePlayer, nickname);
             }
         }
     }
 
-    // === Helper ===
+    // === Helpers ===
 
     private static HytaleGameCommandSource wrapSource(CommandContext ctx, PlayerRef playerRef) {
         return new HytaleGameCommandSource(ctx, playerRef);
+    }
+
+    /**
+     * Extracts the remaining text after the command name from the raw input string.
+     * Used for commands like "/r hello world" where we need the full "hello world".
+     * Hytale's ArgTypes.STRING only captures a single word, so we parse from raw input.
+     *
+     * @param inputString The raw input from CommandContext.getInputString()
+     * @return The message text, or null if no text follows the command name
+     */
+    static String extractMessageAfterCommand(String inputString) {
+        if (inputString == null || inputString.isEmpty()) return null;
+        String trimmed = inputString.trim();
+        // Skip the command name (first token)
+        int spaceIdx = trimmed.indexOf(' ');
+        if (spaceIdx < 0) return null;
+        String remainder = trimmed.substring(spaceIdx + 1).trim();
+        return remainder.isEmpty() ? null : remainder;
+    }
+
+    /**
+     * Extracts the remaining text after a specific token (e.g., a player name) in the raw input.
+     * Used for commands like "/msg PlayerName hello world" where we need "hello world".
+     *
+     * @param inputString The raw input from CommandContext.getInputString()
+     * @param token The token to find and skip past (case-insensitive)
+     * @return The message text after the token, or null if not found or no text follows
+     */
+    static String extractMessageAfterToken(String inputString, String token) {
+        if (inputString == null || inputString.isEmpty() || token == null) return null;
+        // Skip past the command name (first token) to avoid matching player names
+        // that coincide with the command name (e.g., player named "msg" in "/msg msg hello")
+        int firstSpace = inputString.indexOf(' ');
+        if (firstSpace < 0) return null;
+        String afterCommand = inputString.substring(firstSpace + 1);
+        int idx = afterCommand.toLowerCase().indexOf(token.toLowerCase());
+        if (idx < 0) return null;
+        int afterToken = idx + token.length();
+        if (afterToken >= afterCommand.length()) return null;
+        String remainder = afterCommand.substring(afterToken).trim();
+        return remainder.isEmpty() ? null : remainder;
     }
 }
