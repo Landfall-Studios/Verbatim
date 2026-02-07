@@ -8,7 +8,6 @@ import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import world.landfall.verbatim.ChatChannelManager;
 import world.landfall.verbatim.Verbatim;
 import world.landfall.verbatim.discord.DiscordBot;
-import world.landfall.verbatim.util.PermissionService;
 import world.landfall.verbatim.util.PrefixService;
 
 import javax.annotation.Nonnull;
@@ -47,7 +46,7 @@ public class HytaleEntryPoint extends JavaPlugin {
         Verbatim.gameConfig = new HytaleGameConfig(verbatimConfig);
         Verbatim.chatFormatter = new HytaleChatFormatter();
         Verbatim.channelFormatter = new HytaleLocalChannelFormatter();
-        Verbatim.permissionService = new PermissionService();
+        Verbatim.permissionService = new HytalePermissionService();
         Verbatim.prefixService = new PrefixService();
 
         // Register chat and player events
@@ -86,8 +85,8 @@ public class HytaleEntryPoint extends JavaPlugin {
         Verbatim.LOGGER.info("[Verbatim] Initializing Discord Bot...");
         DiscordBot.init();
 
-        Verbatim.LOGGER.info("[Verbatim] Permission nodes will be handled by {} (if available) or default deny.",
-            Verbatim.permissionService.isLuckPermsAvailable() ? "LuckPerms" : "fallback checks");
+        Verbatim.LOGGER.info("[Verbatim] Permission system available: {}",
+            Verbatim.permissionService.isPermissionSystemAvailable() ? "PermissionsPlus" : "fallback checks");
 
         Verbatim.LOGGER.info("[Verbatim] Verbatim plugin started successfully.");
     }

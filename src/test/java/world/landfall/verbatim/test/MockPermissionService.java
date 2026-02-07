@@ -42,16 +42,12 @@ public class MockPermissionService extends PermissionService {
     }
 
     @Override
-    public boolean isLuckPermsAvailable() {
-        return true; // Pretend we have LuckPerms for testing
+    public boolean isPermissionSystemAvailable() {
+        return true; // Pretend we have a permission system for testing
     }
 
     @Override
-    public boolean hasPermission(GamePlayer player, String permissionNode, int opLevelIfLuckPermsAbsent) {
-        if (player == null || permissionNode == null) {
-            return false;
-        }
-
+    protected boolean checkPermission(GamePlayer player, String permissionNode, int fallbackPermissionLevel) {
         // Check explicit permissions first
         Set<String> perms = playerPermissions.get(player.getUUID());
         if (perms != null && perms.contains(permissionNode)) {
