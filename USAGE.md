@@ -32,6 +32,9 @@ Verbatim is a server-side chat plugin providing configurable chat channels, dire
 *   **Favorites & Ignore:**
     *   Favorite players so their name appears to you with a gold gradient in channel messages.
     *   Ignore players to hide their messages from you.
+*   **Offline Mail:**
+    *   Send messages to players who are offline. They receive a notification on login.
+    *   Mailbox holds up to 10 messages per player.
 
 ## Commands
 
@@ -56,6 +59,12 @@ Verbatim is a server-side chat plugin providing configurable chat channels, dire
 *   `/ignore add <player>` - Ignore a player. Their channel messages and DMs are hidden.
 *   `/ignore remove <player>` - Stop ignoring a player.
 *   `/ignore list` - List your ignored players.
+
+### Mail Commands
+
+*   `/mail send <player> <message>` - Send mail to a player (online or offline).
+*   `/mail read` - Read your mail. Unread messages are shown first.
+*   `/mail clear` - Clear all messages from your mailbox.
 
 ### Other Commands
 
@@ -93,7 +102,11 @@ Messages fade into obscured dots as listeners get further from the speaker, even
 
 ## Configuration
 
-### Minecraft (NeoForge)
+### Paper / Spigot
+
+Configuration is in `plugins/Verbatim/config.yml`.
+
+### NeoForge
 
 Configuration is in `verbatim-server.toml` in the server's `config` directory.
 
@@ -148,9 +161,9 @@ Use `&` followed by a code character:
 |------|--------|
 | `&l` | **Bold** |
 | `&o` | *Italic* |
-| `&n` | Underline (Minecraft only) |
-| `&m` | ~~Strikethrough~~ (Minecraft only) |
-| `&k` | Obfuscated (Minecraft only) |
+| `&n` | Underline (Paper & NeoForge only) |
+| `&m` | ~~Strikethrough~~ (Paper & NeoForge only) |
+| `&k` | Obfuscated (Paper & NeoForge only) |
 | `&r` | Reset all formatting |
 
 ### Hex Color Codes

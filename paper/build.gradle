@@ -1,0 +1,88 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow' version '9.3.1'
+}
+
+group = mod_group_id
+version = mod_version
+
+base {
+    archivesName = "${mod_id}-Paper"
+}
+
+java {
+    toolchain.languageVersion = JavaLanguageVersion.of(java_version)
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+}
+
+dependencies {
+    // Core shared logic (resolved via composite build)
+    implementation 'world.landfall:verbatim-core'
+
+    // Paper API (provided by server at runtime)
+    compileOnly 'io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT'
+
+    // LuckPerms (accessed via reflection, compile-only reference)
+    compileOnly 'net.luckperms:api:5.4'
+
+    // Paper provides SLF4J at runtime via Log4j2 bridge - do NOT bundle it
+
+    // JDA (bundled with shadow - Discord integration)
+    implementation 'net.dv8tion:JDA:5.0.0-beta.24'
+
+    // Gson (bundled with shadow - config serialization)
+    implementation 'com.google.code.gson:gson:2.10.1'
+}
+
+tasks {
+    compileJava {
+        options.encoding = 'UTF-8'
+        options.release = Integer.parseInt(java_version)
+    }
+
+    processResources {
+        filteringCharset = 'UTF-8'
+
+        def replaceProperties = [
+            group      : project.group,
+            version    : project.version,
+            description: mod_description
+        ]
+        inputs.properties replaceProperties
+
+        filesMatching('plugin.yml') {
+            expand replaceProperties
+        }
+    }
+
+    jar {
+        enabled = false
+    }
+
+    shadowJar {
+        archiveBaseName.set("${mod_id}-Paper")
+        archiveClassifier.set('')
+
+        // Relocate bundled dependencies to avoid classpath conflicts
+        relocate 'net.dv8tion.jda', 'world.landfall.verbatim.libs.jda'
+        relocate 'com.google.gson', 'world.landfall.verbatim.libs.gson'
+        relocate 'com.neovisionaries.ws', 'world.landfall.verbatim.libs.ws'
+        relocate 'okhttp3', 'world.landfall.verbatim.libs.okhttp3'
+        relocate 'okio', 'world.landfall.verbatim.libs.okio'
+
+        // Exclude SLF4J - Paper provides it at runtime
+        exclude 'org/slf4j/**'
+        exclude 'META-INF/services/org.slf4j.*'
+
+        minimize()
+    }
+
+    build {
+        dependsOn shadowJar
+    }
+}

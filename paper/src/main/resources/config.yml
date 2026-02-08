@@ -1,0 +1,61 @@
+# Verbatim Configuration for Paper
+# Chat channel management plugin
+
+# The default channel players are assigned to on join
+default-channel-name: "global"
+
+# Channel definitions
+channels:
+  - name: "global"
+    displayPrefix: "&a[G]"
+    shortcut: "g"
+    permission: ""
+    range: -1
+    nameColor: "&e"
+    separator: " \u00bb "
+    separatorColor: "&7"
+    messageColor: "&f"
+    alwaysOn: true
+    mature: false
+    nameStyle: "displayName"
+  - name: "local"
+    displayPrefix: "&b[L]"
+    shortcut: "l"
+    permission: ""
+    range: 100
+    nameColor: "&e"
+    separator: " \u00bb "
+    separatorColor: "&7"
+    messageColor: "&7"
+    alwaysOn: true
+    specialChannelType: "local"
+    mature: false
+    nameStyle: "displayName"
+  - name: "staff"
+    displayPrefix: "&c[S]"
+    shortcut: "s"
+    permission: "verbatim.channel.staff"
+    range: -1
+    nameColor: "&d"
+    separator: " &m*&r "
+    separatorColor: "&5"
+    messageColor: "&d"
+    alwaysOn: false
+    mature: false
+    nameStyle: "displayName"
+
+# Discord integration
+discord:
+  enabled: false
+  bot-token: ""
+  channel-id: ""
+  message-prefix: "&9[Discord]&r"
+  message-separator: "&7 \u00bb "
+  use-embed-mode: false
+  name-style: "username"
+
+# Custom join/leave messages
+join-leave:
+  enabled: false
+  join-format: "&a[+]&r {nickname}"
+  leave-format: "&c[-]&r {nickname}"

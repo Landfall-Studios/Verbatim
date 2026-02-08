@@ -1,0 +1,8 @@
+name: Verbatim
+version: '${version}'
+main: world.landfall.verbatim.platform.paper.PaperEntryPoint
+api-version: '1.21'
+description: '${description}'
+author: Landfall
+softdepend:
+  - LuckPerms
