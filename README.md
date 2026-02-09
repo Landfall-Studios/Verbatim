@@ -18,6 +18,7 @@
 |----------|-----------|-------------|-------|
 | **Paper / Spigot** (1.21.4) | `paper/` | Shadow JAR | Full feature support via Adventure API |
 | **NeoForge** (Minecraft 1.21.1) | `neoforge/` | JarJar mod JAR | Full feature support via Minecraft `Style` |
+| **Forge** (Minecraft 1.20.1) | `forge/` | Shadow JAR (`-all`) | Full feature support via Minecraft `Style` |
 | **Hytale** | `hytale/` | Shadow JAR | Limited: no hover/click events, no underline/strikethrough/obfuscated |
 
 All platforms share identical business logic from `core/`. Platform modules only contain adapter code.
@@ -65,7 +66,9 @@ Each module is an independent Gradle project. Build from within each directory:
 cd core && ./gradlew build       # Shared logic + tests
 cd paper && ./gradlew build      # Paper plugin (shadow JAR)
 cd neoforge && ./gradlew build   # NeoForge mod (JarJar)
+cd forge && ./gradlew build      # Forge mod (shadow JAR)
 cd hytale && ./gradlew build     # Hytale plugin (shadow JAR)
 ```
 
 Hytale requires `hytale_server_jar` set in `hytale/gradle.properties`.
+Forge requires Java 17; on NixOS set `org.gradle.java.installations.paths` in `~/.gradle/gradle.properties`.
