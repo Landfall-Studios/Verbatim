@@ -57,4 +57,28 @@ public class FormattedMessageDetails {
 
         return null; // Too far to receive message
     }
+
+    /**
+     * Calculates the obscure percentage for distance-based message fading.
+     * Returns a value between 0.0 (fully clear) and 1.0 (fully obscured).
+     *
+     * @param distance           actual distance between sender and recipient
+     * @param effectiveRange     the clear-hearing range of the channel
+     * @param maxFadeDistance    cap on fade distance (e.g., 15 for Minecraft, 30 for Paper/Hytale)
+     * @param smallRangeMultiplier multiplier when effectiveRange &lt;= 15 (e.g., 1.5 or 2.0)
+     * @param largeRangeFactor   multiplier when effectiveRange &gt; 15 (e.g., 0.3 or 0.6)
+     * @return clamped obscure percentage [0.0, 1.0]
+     */
+    public static double obscurePercentage(double distance, int effectiveRange,
+                                           int maxFadeDistance, double smallRangeMultiplier,
+                                           double largeRangeFactor) {
+        double fadeDistance;
+        if (effectiveRange <= 15) {
+            fadeDistance = effectiveRange * smallRangeMultiplier;
+        } else {
+            fadeDistance = Math.min(maxFadeDistance, effectiveRange * largeRangeFactor);
+        }
+        double percentage = (distance - effectiveRange) / fadeDistance;
+        return Math.min(1.0, Math.max(0.0, percentage));
+    }
 }

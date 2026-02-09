@@ -10,6 +10,7 @@ import world.landfall.verbatim.context.GameComponent;
 import world.landfall.verbatim.context.GamePlayer;
 import world.landfall.verbatim.specialchannels.ChannelFormatter;
 import world.landfall.verbatim.specialchannels.FormattedMessageDetails;
+import world.landfall.verbatim.specialchannels.LocalMessageSuffix;
 
 import java.util.List;
 import java.util.Optional;
@@ -41,15 +42,8 @@ public class PaperLocalChannelFormatter implements ChannelFormatter {
             return originalMessage.copy();
         }
 
-        double fadeDistance;
-        if (effectiveRange <= 15) {
-            fadeDistance = effectiveRange * 2.0;
-        } else {
-            fadeDistance = Math.min(MAX_FADE_DISTANCE, effectiveRange * 0.6);
-        }
-
-        double obscurePercentage = (distance - effectiveRange) / fadeDistance;
-        obscurePercentage = Math.min(1.0, Math.max(0.0, obscurePercentage));
+        double obscurePercentage = FormattedMessageDetails.obscurePercentage(
+                distance, effectiveRange, MAX_FADE_DISTANCE, 2.0, 0.6);
 
         Component adventureMsg = ((PaperGameComponentImpl) originalMessage).toAdventure();
         List<Component> children = adventureMsg.children();
@@ -99,56 +93,24 @@ public class PaperLocalChannelFormatter implements ChannelFormatter {
             return Optional.empty();
         }
 
-        int effectiveRange = 50;
-        String localActionText = "says:";
-        String actualMessageContent = originalMessageContent;
-        boolean applyPlusStyleFormatting = false;
+        LocalMessageSuffix suffix = LocalMessageSuffix.parse(originalMessageContent);
+        int effectiveRange = suffix.effectiveRange();
+        String localActionText = suffix.actionText();
+        boolean applyPlusStyleFormatting = suffix.isRoleplay();
 
-        String messageAfterSuffixRemoval = originalMessageContent;
-
-        if (originalMessageContent.endsWith("!!")) {
-            effectiveRange = 100;
-            localActionText = "shouts:";
-            messageAfterSuffixRemoval = originalMessageContent;
-        } else if (originalMessageContent.endsWith("!")) {
-            effectiveRange = 75;
-            localActionText = "exclaims:";
-            messageAfterSuffixRemoval = originalMessageContent;
-        } else if (originalMessageContent.endsWith("*")) {
-            effectiveRange = 10;
-            localActionText = "whispers:";
-            messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 1);
-        } else if (originalMessageContent.endsWith("?")) {
-            effectiveRange = 50;
-            localActionText = "asks:";
-            messageAfterSuffixRemoval = originalMessageContent;
-        } else if (originalMessageContent.endsWith("$")) {
-            effectiveRange = 3;
-            localActionText = "mutters:";
-            messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 1);
-        } else if (originalMessageContent.endsWith("+")) {
-            effectiveRange = 50;
-            localActionText = "";
-            applyPlusStyleFormatting = true;
-            messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 1);
-        } else if (originalMessageContent.endsWith("))")) {
-            effectiveRange = 50;
-            localActionText = "";
-            applyPlusStyleFormatting = false;
-            messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 2);
-
+        if (suffix.isOOC()) {
             String playerName = sender.getUsername();
             String displayName = sender.getDisplayName();
 
             Component finalMessage = Component.empty()
                 .append(Component.text("[OOC] ").color(TextColor.color(0x555555)))
                 .append(Component.text(playerName + " (" + displayName + "): ").color(TextColor.color(0x555555)))
-                .append(((PaperGameComponentImpl) Verbatim.chatFormatter.parseColors("&8" + messageAfterSuffixRemoval.trim())).toAdventure());
+                .append(((PaperGameComponentImpl) Verbatim.chatFormatter.parseColors("&8" + suffix.trimmedMessage().trim())).toAdventure());
 
             return Optional.of(new FormattedMessageDetails(PaperGameComponentImpl.wrap(finalMessage), effectiveRange, false, "&8"));
         }
 
-        actualMessageContent = messageAfterSuffixRemoval.trim();
+        String actualMessageContent = suffix.trimmedMessage().trim();
 
         Component finalMessage = Component.empty()
             .append(((PaperGameComponentImpl) Verbatim.chatFormatter.parseColors(channelConfig.displayPrefix)).toAdventure())

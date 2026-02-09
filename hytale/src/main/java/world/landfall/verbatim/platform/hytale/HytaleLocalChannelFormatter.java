@@ -9,6 +9,7 @@ import world.landfall.verbatim.context.GameComponent;
 import world.landfall.verbatim.context.GamePlayer;
 import world.landfall.verbatim.specialchannels.ChannelFormatter;
 import world.landfall.verbatim.specialchannels.FormattedMessageDetails;
+import world.landfall.verbatim.specialchannels.LocalMessageSuffix;
 
 import java.util.List;
 import java.util.Optional;
@@ -41,15 +42,8 @@ public class HytaleLocalChannelFormatter implements ChannelFormatter {
             return originalMessage.copy();
         }
 
-        double fadeDistance;
-        if (effectiveRange <= 15) {
-            fadeDistance = effectiveRange * 2.0;
-        } else {
-            fadeDistance = Math.min(MAX_FADE_DISTANCE, effectiveRange * 0.6);
-        }
-
-        double obscurePercentage = (distance - effectiveRange) / fadeDistance;
-        obscurePercentage = Math.min(1.0, Math.max(0.0, obscurePercentage));
+        double obscurePercentage = FormattedMessageDetails.obscurePercentage(
+                distance, effectiveRange, MAX_FADE_DISTANCE, 2.0, 0.6);
 
         // Like the Minecraft version: use getChildren() to find the message structure,
         // keep all prefix components (channel tag, player name, verb) intact,
@@ -123,57 +117,25 @@ public class HytaleLocalChannelFormatter implements ChannelFormatter {
             return Optional.empty();
         }
 
-        int effectiveRange = 50;
-        String localActionText = "says:";
-        String actualMessageContent = originalMessageContent;
-        boolean applyPlusStyleFormatting = false;
+        LocalMessageSuffix suffix = LocalMessageSuffix.parse(originalMessageContent);
+        int effectiveRange = suffix.effectiveRange();
+        String localActionText = suffix.actionText();
+        boolean applyPlusStyleFormatting = suffix.isRoleplay();
 
-        String messageAfterSuffixRemoval = originalMessageContent;
-
-        if (originalMessageContent.endsWith("!!")) {
-            effectiveRange = 100;
-            localActionText = "shouts:";
-            messageAfterSuffixRemoval = originalMessageContent;
-        } else if (originalMessageContent.endsWith("!")) {
-            effectiveRange = 75;
-            localActionText = "exclaims:";
-            messageAfterSuffixRemoval = originalMessageContent;
-        } else if (originalMessageContent.endsWith("*")) {
-            effectiveRange = 10;
-            localActionText = "whispers:";
-            messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 1);
-        } else if (originalMessageContent.endsWith("?")) {
-            effectiveRange = 50;
-            localActionText = "asks:";
-            messageAfterSuffixRemoval = originalMessageContent;
-        } else if (originalMessageContent.endsWith("$")) {
-            effectiveRange = 3;
-            localActionText = "mutters:";
-            messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 1);
-        } else if (originalMessageContent.endsWith("+")) {
-            effectiveRange = 50;
-            localActionText = "";
-            applyPlusStyleFormatting = true;
-            messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 1);
-        } else if (originalMessageContent.endsWith("))")) {
-            effectiveRange = 50;
-            localActionText = "";
-            applyPlusStyleFormatting = false;
-            messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 2);
-
+        if (suffix.isOOC()) {
             String playerName = sender.getUsername();
             String displayName = sender.getDisplayName();
 
             Message finalMessage = Message.join(
                 Message.raw("[OOC] ").color(new Color(0x555555)),
                 Message.raw(playerName + " (" + displayName + "): ").color(new Color(0x555555)),
-                ((HytaleGameComponentImpl) Verbatim.chatFormatter.parseColors("&8" + messageAfterSuffixRemoval.trim())).toHytale()
+                ((HytaleGameComponentImpl) Verbatim.chatFormatter.parseColors("&8" + suffix.trimmedMessage().trim())).toHytale()
             );
 
             return Optional.of(new FormattedMessageDetails(HytaleGameComponentImpl.wrap(finalMessage), effectiveRange, false, "&8"));
         }
 
-        actualMessageContent = messageAfterSuffixRemoval.trim();
+        String actualMessageContent = suffix.trimmedMessage().trim();
 
         Message finalMessage = Message.join(
             ((HytaleGameComponentImpl) Verbatim.chatFormatter.parseColors(channelConfig.displayPrefix)).toHytale(),

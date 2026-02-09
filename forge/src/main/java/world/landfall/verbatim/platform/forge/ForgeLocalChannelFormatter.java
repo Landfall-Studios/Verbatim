@@ -10,6 +10,7 @@ import world.landfall.verbatim.context.GameComponent;
 import world.landfall.verbatim.context.GamePlayer;
 import world.landfall.verbatim.specialchannels.ChannelFormatter;
 import world.landfall.verbatim.specialchannels.FormattedMessageDetails;
+import world.landfall.verbatim.specialchannels.LocalMessageSuffix;
 
 import java.util.List;
 import java.util.Optional;
@@ -41,15 +42,8 @@ public class ForgeLocalChannelFormatter implements ChannelFormatter {
             return originalMessage.copy();
         }
 
-        double fadeDistance;
-        if (effectiveRange <= 15) {
-            fadeDistance = effectiveRange * 1.5;
-        } else {
-            fadeDistance = Math.min(MAX_FADE_DISTANCE, effectiveRange * 0.3);
-        }
-
-        double obscurePercentage = (distance - effectiveRange) / fadeDistance;
-        obscurePercentage = Math.min(1.0, Math.max(0.0, obscurePercentage));
+        double obscurePercentage = FormattedMessageDetails.obscurePercentage(
+                distance, effectiveRange, MAX_FADE_DISTANCE, 1.5, 0.3);
 
         MutableComponent originalMc = ((ForgeGameComponentImpl) originalMessage).toMinecraftMutable();
         List<Component> originalSiblings = originalMc.getSiblings();
@@ -94,44 +88,12 @@ public class ForgeLocalChannelFormatter implements ChannelFormatter {
             return Optional.empty();
         }
 
-        int effectiveRange = 50;
-        String localActionText = "says:";
-        String actualMessageContent = originalMessageContent;
-        boolean applyPlusStyleFormatting = false;
+        LocalMessageSuffix suffix = LocalMessageSuffix.parse(originalMessageContent);
+        int effectiveRange = suffix.effectiveRange();
+        String localActionText = suffix.actionText();
+        boolean applyPlusStyleFormatting = suffix.isRoleplay();
 
-        String messageAfterSuffixRemoval = originalMessageContent;
-
-        if (originalMessageContent.endsWith("!!")) {
-            effectiveRange = 100;
-            localActionText = "shouts:";
-            messageAfterSuffixRemoval = originalMessageContent;
-        } else if (originalMessageContent.endsWith("!")) {
-            effectiveRange = 75;
-            localActionText = "exclaims:";
-            messageAfterSuffixRemoval = originalMessageContent;
-        } else if (originalMessageContent.endsWith("*")) {
-            effectiveRange = 10;
-            localActionText = "whispers:";
-            messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 1);
-        } else if (originalMessageContent.endsWith("?")) {
-            effectiveRange = 50;
-            localActionText = "asks:";
-            messageAfterSuffixRemoval = originalMessageContent;
-        } else if (originalMessageContent.endsWith("$")) {
-            effectiveRange = 3;
-            localActionText = "mutters:";
-            messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 1);
-        } else if (originalMessageContent.endsWith("+")) {
-            effectiveRange = 50;
-            localActionText = "";
-            applyPlusStyleFormatting = true;
-            messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 1);
-        } else if (originalMessageContent.endsWith("))")) {
-            effectiveRange = 50;
-            localActionText = "";
-            applyPlusStyleFormatting = false;
-            messageAfterSuffixRemoval = originalMessageContent.substring(0, originalMessageContent.length() - 2);
-
+        if (suffix.isOOC()) {
             MutableComponent finalMessage = Component.empty();
             finalMessage.append(Component.literal("[OOC] ").withStyle(ChatFormatting.DARK_GRAY));
 
@@ -139,12 +101,12 @@ public class ForgeLocalChannelFormatter implements ChannelFormatter {
             String displayName = sender.getDisplayName();
 
             finalMessage.append(Component.literal(playerName + " (" + displayName + "): ").withStyle(ChatFormatting.DARK_GRAY));
-            finalMessage.append(((ForgeGameComponentImpl) Verbatim.chatFormatter.parseColors("&8" + messageAfterSuffixRemoval.trim())).toMinecraft());
+            finalMessage.append(((ForgeGameComponentImpl) Verbatim.chatFormatter.parseColors("&8" + suffix.trimmedMessage().trim())).toMinecraft());
 
             return Optional.of(new FormattedMessageDetails(ForgeGameComponentImpl.wrap(finalMessage), effectiveRange, false, "&8"));
         }
 
-        actualMessageContent = messageAfterSuffixRemoval.trim();
+        String actualMessageContent = suffix.trimmedMessage().trim();
 
         MutableComponent finalMessage = Component.empty();
 
